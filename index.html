@@ -1,0 +1,326 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <title>Dash Showdown - 3D Geometry Dash Multiplayer</title>
+  <link rel="stylesheet" href="style.css">
+  <script src="libs/three.min.js"></script>
+  <script src="libs/peerjs.min.js"></script>
+</head>
+<body>
+  <!-- Fullscreen 3D WebGL Canvas -->
+  <div id="canvas-container"></div>
+
+  <!-- Cinematic Screen Flash Overlay on Crash -->
+  <div id="screen-flash"></div>
+
+  <!-- Synced Race Countdown Overlay -->
+  <div id="race-countdown-overlay" class="race-countdown-overlay" style="display:none;">
+    <div id="countdown-number" class="countdown-text">3</div>
+    <div id="countdown-sub" class="countdown-sub">GET READY TO DASH!</div>
+  </div>
+
+  <!-- Main Game HUD Overlay -->
+  <div id="hud-container">
+    <!-- Top Edge 4px Glowing Neon Progress Line -->
+    <div class="top-edge-progress">
+      <div id="progress-bar-fill" class="progress-bar-fill"></div>
+      <div id="player-marker" class="player-marker"></div>
+    </div>
+
+    <!-- Floating Sleek Top Bar -->
+    <header class="top-bar">
+      <!-- Left Dock: Tracks & Practice Mode -->
+      <div class="hud-dock left-dock interactive-btn">
+        <button id="level-select-btn" class="hud-pill glow-hover" title="Select Track">
+          <span class="pill-icon">☰</span>
+          <span class="pill-label">TRACKS</span>
+        </button>
+
+        <button id="practice-toggle-btn" class="hud-pill practice-pill glow-hover" title="Toggle Practice Mode (P)">
+          <span class="pill-icon">✦</span>
+          <span class="pill-label">PRACTICE</span>
+        </button>
+
+        <!-- Checkpoint Dock (Slides open when Practice is ON) -->
+        <div id="checkpoint-dock" class="checkpoint-dock" style="display:none;">
+          <button id="place-cp-btn" class="hud-pill cp-add-btn glow-hover" title="Drop Checkpoint (Z)">+ CP</button>
+          <button id="delete-cp-btn" class="hud-pill cp-del-btn glow-hover" title="Remove Checkpoint (X)">− CP</button>
+        </div>
+      </div>
+
+      <!-- Center Island: Track Title, Difficulty Capsule & Real-Time Progress -->
+      <div class="center-island interactive-btn" id="center-island">
+        <span id="level-name" class="track-title-text">STEREO BLITZ</span>
+        <span id="diff-badge" class="diff-capsule">1★ EASY</span>
+        <span id="progress-percent" class="progress-percent-val">0.0%</span>
+      </div>
+
+      <!-- Right Dock: Party Multiplayer, Memes, Restart, Mute -->
+      <div class="hud-dock right-dock interactive-btn">
+        <button id="party-btn" class="hud-pill party-pill glow-hover" title="Play With Friends (Multiplayer)">
+          <span class="party-pulse-dot"></span>
+          <span class="pill-icon">👥</span>
+          <span id="party-mode-label" class="party-label">INVITE FRIENDS</span>
+          <span id="party-count-badge" class="party-badge">1</span>
+        </button>
+
+        <button id="meme-chaos-btn" class="hud-pill icon-only-pill meme-pill glow-hover" title="Meme Chaos Menu">
+          <span>🤪</span>
+        </button>
+        <button id="restart-btn" class="hud-pill icon-only-pill glow-hover" title="Restart (R)">
+          <span>↻</span>
+        </button>
+        <button id="mute-btn" class="hud-pill icon-only-pill glow-hover" title="Mute Audio (M)">
+          <span>🔊</span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Sleek Micro-HUD Stats Strip (Under top bar, non-intrusive) -->
+    <div class="micro-stats-strip">
+      <div id="gem-counter" class="micro-stat gem-stat" title="Gems Collected">💎 <span id="gem-count-text">0 / 0</span></div>
+      <div id="attempt-count" class="micro-stat attempt-stat">ATTEMPT <span>1</span></div>
+      <div id="best-record" class="micro-stat best-stat">BEST <span>0%</span></div>
+    </div>
+
+    <!-- Top Center Animated Tung Tung Sahur Alert Banner -->
+    <div id="tung-tung-banner" class="tung-tung-banner" style="display:none;">
+      <div class="tung-tung-banner-content">
+        <img src="assets/memes/tung_tung_avatar.png" class="tung-tung-banner-img" alt="Tung Tung" />
+        <div class="tung-tung-banner-text">
+          <div class="tung-tung-banner-title">⏰ WAKE UP! TUNG TUNG SAHUR! 🥁</div>
+          <div id="tung-tung-banner-sub" class="tung-tung-banner-sub">BEATING THE SULFUR CUBE! (SAHUR SAHUR!)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Floating Minimalist Race Leaderboard Panel (Collapsible) -->
+    <div class="leaderboard-panel interactive-btn" id="leaderboard-panel">
+      <div class="leaderboard-header">
+        <div class="leaderboard-header-title">
+          <span class="live-dot"></span>
+          <span>LIVE RACERS</span>
+        </div>
+        <button id="toggle-leaderboard-btn" class="leaderboard-toggle-btn" title="Toggle Mini/Full">−</button>
+      </div>
+      <div id="leaderboard-list" class="leaderboard-body">
+        <!-- Dynamically rendered racer rows -->
+      </div>
+    </div>
+
+    <!-- Bottom Right Animated Brainrot Pop-Up -->
+    <div id="brainrot-popup" class="brainrot-popup" style="display:none;">
+      <div class="brainrot-content">
+        <div id="brainrot-avatar" class="brainrot-avatar">🚽</div>
+        <div class="brainrot-text-col">
+          <div id="brainrot-title" class="brainrot-title">SKIBIDI RIZZ</div>
+          <div id="brainrot-quote" class="brainrot-quote">+1000 AURA 🔥</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Bottom Center Input Hint Capsule -->
+    <div class="input-hint" id="input-hint">
+      <span>TAP / CLICK / SPACE TO JUMP • HOLD FOR SHIP</span>
+    </div>
+  </div>
+
+  <!-- Party / Multiplayer Modal Drawer -->
+  <div id="party-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card party-card">
+      <div class="modal-header">
+        <div class="modal-header-col">
+          <h2>⚡ PLAY WITH FRIENDS (MULTIPLAYER)</h2>
+          <div class="modal-subtitle">WebRTC Peer-to-Peer • Instant Play on Web • 0 Server Required</div>
+        </div>
+        <button id="close-party-modal" class="modal-close-btn interactive-btn">✕</button>
+      </div>
+
+      <div class="party-body">
+        <!-- 1. Shareable Invite Link Card -->
+        <div class="party-invite-card">
+          <div class="invite-card-header">
+            <span class="invite-icon">🔗</span>
+            <span class="invite-title">DIRECT WEB INVITE LINK:</span>
+            <span class="invite-badge">SHARE ANYWHERE</span>
+          </div>
+          <div class="invite-input-row">
+            <input type="text" id="party-share-url" class="invite-link-input" readonly />
+            <button id="party-copy-link-btn" class="action-btn copy-link-btn interactive-btn">
+              📋 COPY INVITE LINK
+            </button>
+          </div>
+          <div class="invite-helper-text">Send this link to friends on Discord, WhatsApp or iMessage. They click it to instantly join your race!</div>
+        </div>
+
+        <!-- 2. Gamer Profile Customizer -->
+        <div class="player-custom-card">
+          <div class="custom-field">
+            <label>🏷️ YOUR GAMER TAG:</label>
+            <input type="text" id="player-name-input" class="player-name-input" maxlength="14" placeholder="Enter name..." />
+          </div>
+          <div class="custom-field">
+            <label>🎨 CUBE COLOR:</label>
+            <div class="color-swatches" id="color-swatches">
+              <button class="color-swatch active" data-color="#00FF88" style="background:#00FF88;" title="Mint Volt"></button>
+              <button class="color-swatch" data-color="#00F0FF" style="background:#00F0FF;" title="Cyber Cyan"></button>
+              <button class="color-swatch" data-color="#FF007F" style="background:#FF007F;" title="Hot Pink"></button>
+              <button class="color-swatch" data-color="#FFD000" style="background:#FFD000;" title="Solar Gold"></button>
+              <button class="color-swatch" data-color="#B026FF" style="background:#B026FF;" title="Neon Violet"></button>
+              <button class="color-swatch" data-color="#FF3344" style="background:#FF3344;" title="Inferno Red"></button>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3. Connected Racers Lobby -->
+        <div class="party-lobby-section">
+          <div class="lobby-header-row">
+            <span class="lobby-title">PLAYERS IN ROOM (<span id="lobby-player-count">1</span>/8)</span>
+            <span id="lobby-connection-status" class="connection-status-pill status-hosting">🟢 HOSTING ROOM</span>
+          </div>
+          <div class="party-members-list" id="party-members-list">
+            <!-- Dynamically rendered player cards -->
+          </div>
+        </div>
+
+        <!-- 4. Join Friend's Room By Code -->
+        <div class="join-room-accordion">
+          <details>
+            <summary class="interactive-btn">Want to join a friend's existing room? Click here</summary>
+            <div class="join-room-box">
+              <input type="text" id="join-room-code-input" class="join-code-input" placeholder="e.g. DASH-1234 or paste invite link..." />
+              <button id="join-room-btn" class="action-btn join-room-btn interactive-btn">JOIN ROOM ➔</button>
+            </div>
+          </details>
+        </div>
+
+        <!-- 5. Action Footer -->
+        <div class="party-footer">
+          <button id="start-party-run-btn" class="action-btn start-race-btn interactive-btn">
+            🚀 START RACE (SYNCED 3..2..1)
+          </button>
+          <button id="party-new-code-btn" class="minimal-pill new-room-btn interactive-btn" title="Create New Room Code">
+            ↻ NEW ROOM
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Selection Modal Drawer -->
+  <div id="level-select-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card">
+      <div class="modal-header">
+        <h2>SELECT TRACK</h2>
+        <button id="close-level-modal" class="modal-close-btn interactive-btn">✕</button>
+      </div>
+      <div id="level-cards-container" class="level-grid">
+        <!-- Handcrafted Level Cards inserted via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Level Complete Victory Modal -->
+  <div id="victory-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card victory-card">
+      <div class="victory-trophy">🏆</div>
+      <h1 class="victory-title">LEVEL COMPLETE</h1>
+      <div id="victory-attempts" class="victory-subtitle">Completed in 1 Attempt!</div>
+      <div class="victory-actions">
+        <button id="victory-next-btn" class="action-btn next-level-btn interactive-btn">NEXT TRACK →</button>
+        <button id="victory-replay-btn" class="action-btn replay-btn interactive-btn">REPLAY ↻</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Smurf Cat "We Live We Love We Lie" Repeat Death Modal -->
+  <div id="smurf-cat-modal" class="modal-overlay smurf-modal-overlay" style="display:none;">
+    <div class="modal-card smurf-card">
+      <div class="smurf-glow-ring"></div>
+      <img src="assets/memes/smurf_cat.jpg" class="smurf-portrait" alt="Smurf Cat Shailushai" />
+      <div class="smurf-quote-title">WE LIVE • WE LOVE • WE LIE</div>
+      <div id="smurf-death-msg" class="smurf-subtitle">You have fallen 3 times at this spot.</div>
+      <div class="smurf-lore">Shailushai has descended into the cyber void to heal your wounded soul with the sacred blue aura.</div>
+      <div class="smurf-stats-row">
+        <div class="smurf-stat">AURA GAINED: <span class="aura-val">+10,000 🔥</span></div>
+        <div class="smurf-stat">STATUS: <span class="aura-val">BLESSED 🍄</span></div>
+      </div>
+      <button id="smurf-resume-btn" class="action-btn smurf-action-btn interactive-btn">EMBRACE DESTINY & RESUME (SPACE / CLICK) ↻</button>
+    </div>
+  </div>
+
+  <!-- Meme Chaos Dashboard Modal Drawer -->
+  <div id="meme-chaos-modal" class="modal-overlay" style="display:none;">
+    <div class="modal-card meme-chaos-card">
+      <div class="modal-header">
+        <h2>🤪 MEME CHAOS DASHBOARD</h2>
+        <button id="close-meme-chaos-modal" class="modal-close-btn interactive-btn">✕</button>
+      </div>
+      <div class="meme-chaos-body">
+        <div class="meme-triggers-grid">
+          <button id="summon-tung-tung-btn" class="action-btn meme-action-btn interactive-btn">
+            <span class="meme-btn-icon">🥁</span>
+            <div class="meme-btn-col">
+              <div class="meme-btn-title">SUMMON TUNG TUNG</div>
+              <div class="meme-btn-desc">Pop in & beat the cube right now!</div>
+            </div>
+          </button>
+          <button id="summon-smurf-cat-btn" class="action-btn meme-action-btn interactive-btn">
+            <span class="meme-btn-icon">🍄</span>
+            <div class="meme-btn-col">
+              <div class="meme-btn-title">SUMMON SMURF CAT</div>
+              <div class="meme-btn-desc">We live, we love, we lie</div>
+            </div>
+          </button>
+          <button id="test-metal-pipe-btn" class="action-btn meme-action-btn interactive-btn">
+            <span class="meme-btn-icon">🔔</span>
+            <div class="meme-btn-col">
+              <div class="meme-btn-title">FALLING METAL PIPE</div>
+              <div class="meme-btn-desc">Instant reverberating clang</div>
+            </div>
+          </button>
+          <button id="test-vine-boom-btn" class="action-btn meme-action-btn interactive-btn">
+            <span class="meme-btn-icon">💥</span>
+            <div class="meme-btn-col">
+              <div class="meme-btn-title">VINE BOOM</div>
+              <div class="meme-btn-desc">Ultra deep 808 sub-bass</div>
+            </div>
+          </button>
+        </div>
+
+        <div class="chaos-setting-row">
+          <label>CHAOS FREQUENCY:</label>
+          <div class="party-modes-row">
+            <button class="chaos-freq-btn" data-freq="off">OFF</button>
+            <button class="chaos-freq-btn active" data-freq="normal">NORMAL</button>
+            <button class="chaos-freq-btn" data-freq="high">MAX BRAINROT</button>
+          </div>
+        </div>
+
+        <div class="custom-audio-box">
+          <div class="custom-audio-title">📁 CUSTOM MEME AUDIO UPLOADER</div>
+          <div class="custom-audio-desc">Upload your own downloaded meme MP3s from your device to wing it completely!</div>
+          <div class="upload-slots-grid">
+            <div class="upload-slot">
+              <label>🥁 Tung Tung Sound:</label>
+              <input type="file" id="upload-tung-tung" accept="audio/*" class="custom-audio-input" />
+            </div>
+            <div class="upload-slot">
+              <label>🍄 Smurf Cat Audio:</label>
+              <input type="file" id="upload-smurf-cat" accept="audio/*" class="custom-audio-input" />
+            </div>
+            <div class="upload-slot">
+              <label>💥 Death / Crash SFX:</label>
+              <input type="file" id="upload-crash" accept="audio/*" class="custom-audio-input" />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="game.js"></script>
+</body>
+</html>
