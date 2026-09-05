@@ -167,8 +167,14 @@ export class GameRenderer {
     // 11. Tung Tung Sahur 3D Meme Whacking Rig
     this.setupTungTungCharacter();
 
-    // 12. Window Resize
+    // 12. Window & Mobile Viewport Resize
     window.addEventListener('resize', () => this.onWindowResize());
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', () => this.onWindowResize());
+    }
+    window.addEventListener('orientationchange', () => {
+      setTimeout(() => this.onWindowResize(), 150);
+    });
   }
 
   setupLighting() {
@@ -2093,10 +2099,11 @@ export class GameRenderer {
 
   onWindowResize() {
     if (!this.renderer || !this.camera || !this.container) return;
-    const width = this.container.clientWidth || window.innerWidth;
-    const height = this.container.clientHeight || window.innerHeight;
+    const width = window.visualViewport ? window.visualViewport.width : (this.container.clientWidth || window.innerWidth);
+    const height = window.visualViewport ? window.visualViewport.height : (this.container.clientHeight || window.innerHeight);
     this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
+    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2));
   }
 }

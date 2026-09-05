@@ -80,9 +80,10 @@ class GameManager {
 
     // Meme Chaos State (Tung Tung Sahur, Smurf Cat & Audio Engine)
     this.deathSpotCounts = new Map();
-    this.tungTungTimer = Math.random() * 8 + 15;
+    this.tungTungTimer = Math.random() * 20 + 60;
     this.isTungTungActive = false;
     this.chaosMode = 'normal'; // 'off', 'normal', 'high'
+    this.lastBrainrotPopTime = 0;
     this.nearMissCooldown = 0;
     this.playerSmurfAura = false;
 
@@ -308,7 +309,7 @@ class GameManager {
   }
 
   setupGhosts() {
-    if (this.multiplayer && this.multiplayer.players && this.multiplayer.players.size > 1) {
+    if (this.multiplayer && (this.multiplayer.roomCode || this.multiplayer.isConnected || (this.multiplayer.players && this.multiplayer.players.size > 1))) {
       this.onMultiplayerRosterUpdated(Array.from(this.multiplayer.players.values()));
       return;
     }
@@ -403,8 +404,9 @@ class GameManager {
     this.deathSpotCounts.set(spotKey, spotDeaths);
 
     // 🍄 SMURF CAT REQUIREMENT:
-    // Only after user dies at the same spot 2 or more times!
-    if (spotDeaths >= 2 && !this.practiceMode) {
+    // Only after user struggles at the same spot 5 or more times, and reset spot count to avoid continuous death loops!
+    if (spotDeaths >= 5 && !this.practiceMode) {
+      this.deathSpotCounts.set(spotKey, 0);
       this.triggerSmurfCatIntervention(spotKey, spotDeaths);
       return;
     }
@@ -459,6 +461,7 @@ class GameManager {
   // 🍄 Smurf Cat (Shailushai) Repeat Death Philosophical Event
   triggerSmurfCatIntervention(spotKey, spotDeaths) {
     this.gameState = 'SMURF_CAT';
+    this.player.isAlive = false;
     this.jumpBufferTimer = 0;
     this.coyoteTimer = 0;
     audio.updateShipThrust(0);
@@ -498,7 +501,10 @@ class GameManager {
       this.renderer.setSmurfCatAura(true);
     }
 
+    this.lastTime = performance.now();
+    this.gameState = 'PLAYING';
     this.resetPlayer(false);
+    audio.resumeMusic();
     this.triggerBrainrotPop("smurf", "SMURF CAT BLESSING", "WE LIVE WE LOVE WE LIE 🍄🐱 (+10,000 AURA)");
   }
 
@@ -549,12 +555,14 @@ class GameManager {
   // 🗿 Near Miss Spike Dodge ("WHAT THE SIGMA?!")
   onNearMissSpike(x, y) {
     if (this.nearMissCooldown > 0) return;
-    this.nearMissCooldown = 2.5;
+    this.nearMissCooldown = 15.0;
     audio.playWhatTheSigma();
     if (this.renderer) {
       this.renderer.triggerComicHitText(x, y + 1.2, "WHAT THE SIGMA?! 🗿", "#00F0FF");
     }
-    this.triggerBrainrotPop("sigma", "WHAT THE SIGMA?!", "NARROW ESCAPE! +5,000 AURA 🗿");
+    if (this.chaosMode === 'high') {
+      this.triggerBrainrotPop("sigma", "WHAT THE SIGMA?!", "NARROW ESCAPE! +5,000 AURA 🗿");
+    }
   }
 
   // 🤪 Meme Chaos Dashboard
@@ -1417,7 +1425,6 @@ class GameManager {
             audio.playGemCollect();
             this.renderer.triggerGemCollect(i, obs.x, obs.y, obs.color || 0x00ffff);
             this.updateGemHUD();
-            this.triggerBrainrotPop("gem");
           }
         }
       }
@@ -1460,7 +1467,6 @@ class GameManager {
               }
               p.isGrounded = false;
               audio.playVineBoom();
-              this.triggerBrainrotPop("gravity");
             }
           }
         }
@@ -1473,11 +1479,9 @@ class GameManager {
           if (obs.subType === 'ship' && p.vehicleMode !== 'ship') {
             p.vehicleMode = 'ship';
             audio.playPadLaunch();
-            this.triggerBrainrotPop("portal");
           } else if (obs.subType === 'wave' && p.vehicleMode !== 'wave') {
             p.vehicleMode = 'wave';
             audio.playPadLaunch();
-            this.triggerBrainrotPop("portal");
           } else if (obs.subType === 'cube' && p.vehicleMode !== 'cube') {
             p.vehicleMode = 'cube';
             audio.updateShipThrust(0);
@@ -1486,12 +1490,10 @@ class GameManager {
             p.gravityDir = -1;
             audio.playGravityFlip(true);
             audio.playVineBoom();
-            this.triggerBrainrotPop("gravity");
           } else if (obs.subType === 'gravity_down' && p.gravityDir !== 1) {
             p.gravityDir = 1;
             audio.playGravityFlip(false);
             audio.playVineBoom();
-            this.triggerBrainrotPop("gravity");
           }
         }
       }
@@ -1609,14 +1611,16 @@ class GameManager {
     }
 
     // 3. Dynamic Brainrot Milestones (25%, 50%, 75%)
-    [25, 50, 75].forEach(pct => {
-      if (progress >= pct && !this.brainrotMilestones.has(pct)) {
-        this.brainrotMilestones.add(pct);
-        if (pct === 25) this.triggerBrainrotPop("m25", "25% PASSED", "MEWING STREAK MAINTAINED 🤫🧏");
-        else if (pct === 50) this.triggerBrainrotPop("m50", "HALFWAY THERE", "WE LIVE WE LOVE WE LIE 🍄🐱");
-        else if (pct === 75) this.triggerBrainrotPop("m75", "75% CLIMAX", "WHAT THE SIGMA?! ULTRA AURA 🗿");
-      }
-    });
+    if (this.chaosMode === 'high' || this.chaosMode === 'normal') {
+      [25, 50, 75].forEach(pct => {
+        if (progress >= pct && !this.brainrotMilestones.has(pct)) {
+          this.brainrotMilestones.add(pct);
+          if (pct === 25 && this.chaosMode === 'high') this.triggerBrainrotPop("m25", "25% PASSED", "MEWING STREAK MAINTAINED 🤫🧏");
+          else if (pct === 50) this.triggerBrainrotPop("m50", "HALFWAY THERE", "WE LIVE WE LOVE WE LIE 🍄🐱");
+          else if (pct === 75 && this.chaosMode === 'high') this.triggerBrainrotPop("m75", "75% CLIMAX", "WHAT THE SIGMA?! ULTRA AURA 🗿");
+        }
+      });
+    }
   }
 
   updateGemHUD() {
@@ -1626,6 +1630,14 @@ class GameManager {
 
   triggerBrainrotPop(type, customTitle = "", customQuote = "") {
     if (!this.dom.brainrotPopup) return;
+    if (this.chaosMode === 'off') return;
+
+    const now = performance.now();
+    // Throttle in-game popups to at most once every 12 seconds during gameplay
+    if (this.gameState === 'PLAYING' && (now - this.lastBrainrotPopTime < 12000) && !customTitle) {
+      return;
+    }
+    this.lastBrainrotPopTime = now;
 
     let meme = this.brainrotMemes[Math.floor(Math.random() * this.brainrotMemes.length)];
     if (type === "gem") {
@@ -1649,7 +1661,7 @@ class GameManager {
     if (this.brainrotTimeout) clearTimeout(this.brainrotTimeout);
     this.brainrotTimeout = setTimeout(() => {
       this.dom.brainrotPopup.style.display = 'none';
-    }, 2000);
+    }, 1800);
   }
 
   setPartyMode(mode) {
@@ -1838,6 +1850,8 @@ class GameManager {
   }
 
   startGameSolo() {
+    this.partyMode = 'solo';
+    this.setupGhosts();
     if (this.dom.startScreenOverlay) {
       this.dom.startScreenOverlay.style.display = 'none';
     }
@@ -2052,19 +2066,14 @@ class GameManager {
     this.renderMenuLobbyRoster(playersList);
 
     const opponents = playersList.filter(p => !p.isPlayer);
-    const botFill = this.partyRoster.slice(1, 4).filter(b => !opponents.some(o => o.name === b.name));
-    const allOpponents = [
-      ...opponents.map(p => ({ ...p, isBot: false })),
-      ...botFill.slice(0, Math.max(0, 3 - opponents.length)).map(b => ({ ...b, isBot: true }))
-    ];
-
-    this.ghostConfigs = allOpponents;
+    // Real connected friends only in multiplayer! No bots in party/multiplayer!
+    this.ghostConfigs = opponents.map(p => ({ ...p, isBot: false }));
     this.ghostStates = this.ghostConfigs.map(cfg => ({
       id: cfg.id,
       name: cfg.name,
       colorHex: cfg.colorHex,
       color: cfg.color || parseInt((cfg.colorHex || '#FF007F').replace('#', '0x'), 16),
-      isBot: cfg.isBot,
+      isBot: false,
       x: 0,
       y: 0,
       vy: 0,
@@ -2097,6 +2106,10 @@ class GameManager {
     if (!this.dom.raceCountdownOverlay) return;
 
     this.dom.raceCountdownOverlay.style.display = 'flex';
+    this.partyMode = 'multiplayer';
+    if (this.multiplayer && this.multiplayer.players) {
+      this.onMultiplayerRosterUpdated(Array.from(this.multiplayer.players.values()));
+    }
     this.gameState = 'COUNTDOWN';
     this.resetPlayer(true);
 
@@ -2153,7 +2166,7 @@ class GameManager {
   // -------------------------------------------------------------
 
   gameLoop(currentTime) {
-    const dt = Math.min(0.05, (currentTime - this.lastTime) / 1000);
+    const dt = Math.min(0.033, (currentTime - this.lastTime) / 1000);
     this.lastTime = currentTime;
 
     // A. Main Menu State: Gently drift ambient 3D camera without gameplay physics
@@ -2173,8 +2186,8 @@ class GameManager {
       return;
     }
 
-    // B. Paused State: Freeze game loop & animations in place
-    if (this.gameState === 'PAUSED') {
+    // B. Paused / Smurf Cat State: Completely freeze game loop, physics & animations
+    if (this.gameState === 'PAUSED' || this.gameState === 'SMURF_CAT') {
       this.renderer.update({
         x: this.player.x,
         y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
@@ -2183,7 +2196,7 @@ class GameManager {
         vehicleMode: this.player.vehicleMode,
         gravityDir: this.player.gravityDir,
         isGrounded: this.player.isGrounded,
-        isAlive: this.player.isAlive,
+        isAlive: this.gameState === 'PAUSED' ? this.player.isAlive : false,
         isThrusting: false
       }, 0);
       requestAnimationFrame(t => this.gameLoop(t));
@@ -2195,11 +2208,11 @@ class GameManager {
 
     // 1b. Update Meme Chaos Timers (Tung Tung Sahur Random Event)
     if (this.gameState === 'PLAYING' && this.chaosMode !== 'off') {
-      const interval = (this.chaosMode === 'high') ? 11 : 22;
+      const interval = (this.chaosMode === 'high') ? 45 : 75;
       this.tungTungTimer -= dt;
       if (this.tungTungTimer <= 0 && this.player.isAlive) {
         this.triggerTungTungSahur();
-        this.tungTungTimer = Math.random() * 8 + interval;
+        this.tungTungTimer = Math.random() * 15 + interval;
       }
     }
     if (this.nearMissCooldown > 0) {

@@ -597,29 +597,26 @@ class AudioManager {
   preloadMemeAudio() {
     if (typeof window === 'undefined') return;
 
-    const soundPaths = {
-      tung_tung: 'assets/sounds/tung_tung_sahur.mp3',
-      smurf_cat: 'assets/sounds/smurf_cat.mp3',
-      bonk: 'assets/sounds/bonk.mp3',
-      metal_pipe: 'assets/sounds/metal_pipe.mp3',
-      vine_boom: 'assets/sounds/vine_boom.mp3',
-      what_the_sigma: 'assets/sounds/voice_what_the_sigma.mp3'
+    const candidatePaths = {
+      tung_tung: ['assets/sounds/tung_tung_sahur.mp3', 'assets/sounds/tung_tung_sahur.wav', 'assets/sounds/kentongan_beat.wav'],
+      smurf_cat: ['assets/sounds/smurf_cat.mp3', 'assets/sounds/smurf_cat.wav', 'assets/sounds/spectre_synth.wav'],
+      bonk: ['assets/sounds/bonk.mp3', 'assets/sounds/bonk.wav'],
+      metal_pipe: ['assets/sounds/metal_pipe.mp3', 'assets/sounds/metal_pipe.wav'],
+      vine_boom: ['assets/sounds/vine_boom.mp3', 'assets/sounds/vine_boom.wav'],
+      what_the_sigma: ['assets/sounds/voice_what_the_sigma.mp3', 'assets/sounds/voice_what_the_sigma.wav']
     };
 
-    for (const [key, path] of Object.entries(soundPaths)) {
-      // 1. HTML5 Audio backup
-      const audioEl = new Audio();
-      audioEl.src = path;
-      audioEl.preload = 'auto';
-      this.memeClips[key] = audioEl;
+    const loadCandidate = async (key, paths) => {
+      for (const path of paths) {
+        try {
+          const res = await fetch(path);
+          if (!res.ok) continue;
+          const buffer = await res.arrayBuffer();
+          const audioEl = new Audio();
+          audioEl.src = path;
+          audioEl.preload = 'auto';
+          this.memeClips[key] = audioEl;
 
-      // 2. Web Audio ArrayBuffer for zero latency
-      fetch(path)
-        .then(res => {
-          if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          return res.arrayBuffer();
-        })
-        .then(buffer => {
           if (this.ctx) {
             this.ctx.decodeAudioData(buffer.slice(0), decoded => {
               this.audioBuffers[key] = decoded;
@@ -627,10 +624,15 @@ class AudioManager {
           } else {
             this.pendingBuffers[key] = buffer;
           }
-        })
-        .catch(err => {
-          // Graceful fallback to procedural generation
-        });
+          return;
+        } catch (e) {
+          // fallback to next format candidate
+        }
+      }
+    };
+
+    for (const [key, paths] of Object.entries(candidatePaths)) {
+      loadCandidate(key, paths);
     }
   }
 
