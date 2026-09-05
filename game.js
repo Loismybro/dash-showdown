@@ -1715,6 +1715,8 @@ class GameManager {
         <span class="party-slot-status">${m.isHost ? 'HOST' : 'READY'}</span>
       </div>
     `).join('');
+  }
+
   // -------------------------------------------------------------
   // PAUSE MENU & START SCREEN SYSTEMS
   // -------------------------------------------------------------
