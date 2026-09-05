@@ -69,6 +69,9 @@
         <button id="meme-chaos-btn" class="hud-pill icon-only-pill meme-pill glow-hover" title="Meme Chaos Menu">
           <span>🤪</span>
         </button>
+        <button id="pause-btn" class="hud-pill icon-only-pill pause-pill glow-hover" title="Pause Game (ESC)">
+          <span>⏸</span>
+        </button>
         <button id="restart-btn" class="hud-pill icon-only-pill glow-hover" title="Restart (R)">
           <span>↻</span>
         </button>
@@ -355,8 +358,188 @@
               <input type="file" id="upload-crash" accept="audio/*" class="custom-audio-input" />
             </div>
           </div>
+  <!-- Pause Game Modal Overlay -->
+  <div id="pause-modal" class="modal-overlay pause-modal-overlay" style="display:none;">
+    <div class="modal-card pause-card">
+      <div class="modal-header">
+        <div class="modal-header-col">
+          <h2>⏸ GAME PAUSED</h2>
+          <div id="pause-track-sub" class="modal-subtitle">STEREO BLITZ • 0.0% COMPLETED</div>
+        </div>
+        <button id="close-pause-modal" class="modal-close-btn interactive-btn" title="Resume Game">✕</button>
+      </div>
+
+      <div class="pause-actions-list">
+        <button id="pause-resume-btn" class="action-btn resume-btn interactive-btn">
+          ▶ RESUME RACE (ESC / SPACE)
+        </button>
+        <button id="pause-restart-btn" class="action-btn restart-action-btn interactive-btn">
+          ↻ RESTART TRACK (R)
+        </button>
+        <button id="pause-practice-btn" class="action-btn practice-action-btn interactive-btn">
+          ✦ PRACTICE MODE: <span id="pause-practice-status">OFF</span> (P)
+        </button>
+        <button id="pause-party-btn" class="action-btn party-action-btn interactive-btn">
+          👥 PLAY WITH FRIENDS (MULTIPLAYER)
+        </button>
+        <button id="pause-tracks-btn" class="action-btn tracks-action-btn interactive-btn">
+          ☰ SELECT TRACK
+        </button>
+        <button id="pause-title-btn" class="minimal-pill title-return-btn interactive-btn">
+          🏠 RETURN TO TITLE SCREEN
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- High-Budget Starting Screen Overlay (Title & Multiplayer Lobby) -->
+  <div id="start-screen-overlay" class="start-screen-overlay">
+    <div class="start-screen-backdrop"></div>
+
+    <div class="start-screen-container">
+      <!-- 1. Top Cyber Branding Header -->
+      <div class="title-brand-block">
+        <div class="title-top-tag">⚡ NEXT-GEN 3D RHYTHM PLATFORMER</div>
+        <h1 class="hero-game-title">
+          <span class="dash-word">DASH</span>
+          <span class="showdown-word">SHOWDOWN</span>
+          <span class="d3-badge">3D</span>
+        </h1>
+        <div class="title-feature-tags">
+          <span class="feature-tag">🌐 Real-Time WebRTC</span>
+          <span class="feature-tag">⚡ 0 Servers</span>
+          <span class="feature-tag">🥁 Meme Chaos</span>
+          <span class="feature-tag">🎵 Procedural EDM</span>
         </div>
       </div>
+
+      <!-- 2. Main Menu View -->
+      <div id="main-menu-view" class="start-menu-view">
+        <!-- Player Customizer Capsule -->
+        <div class="menu-profile-card">
+          <div class="menu-cube-preview-wrap">
+            <div id="menu-cube-preview" class="menu-cube-preview" style="background:#00FF88; box-shadow:0 0 25px rgba(0, 255, 136, 0.6);">
+              <div class="cube-preview-face">
+                <span class="preview-eyes">✦ ✦</span>
+              </div>
+            </div>
+          </div>
+          <div class="menu-profile-details">
+            <div class="menu-tag-row">
+              <label>🏷️ GAMER TAG:</label>
+              <input type="text" id="menu-player-name-input" class="menu-name-input" maxlength="14" placeholder="Enter tag..." />
+            </div>
+            <div class="menu-color-row">
+              <label>🎨 NEON AURA:</label>
+              <div class="color-swatches" id="menu-color-swatches">
+                <button class="color-swatch active" data-color="#00FF88" style="background:#00FF88;" title="Mint Volt"></button>
+                <button class="color-swatch" data-color="#00F0FF" style="background:#00F0FF;" title="Cyber Cyan"></button>
+                <button class="color-swatch" data-color="#FF007F" style="background:#FF007F;" title="Hot Pink"></button>
+                <button class="color-swatch" data-color="#FFD000" style="background:#FFD000;" title="Solar Gold"></button>
+                <button class="color-swatch" data-color="#B026FF" style="background:#B026FF;" title="Neon Violet"></button>
+                <button class="color-swatch" data-color="#FF3344" style="background:#FF3344;" title="Inferno Red"></button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Hero Play Buttons -->
+        <div class="menu-action-cards">
+          <button id="menu-play-solo-btn" class="menu-hero-btn solo-hero-btn interactive-btn glow-hover">
+            <div class="hero-btn-glow"></div>
+            <span class="hero-icon">▶</span>
+            <div class="hero-text-col">
+              <span class="hero-title">PLAY SOLO</span>
+              <span class="hero-sub">Instant Speed Run • Checkpoints Available</span>
+            </div>
+            <span class="hero-arrow">➔</span>
+          </button>
+
+          <button id="menu-play-friends-btn" class="menu-hero-btn party-hero-btn interactive-btn glow-hover">
+            <div class="hero-btn-glow"></div>
+            <span class="hero-icon">👥</span>
+            <div class="hero-text-col">
+              <span class="hero-title">PLAY WITH FRIENDS</span>
+              <span class="hero-sub">Create Room • Share Link • Synced 3..2..1 Race</span>
+            </div>
+            <span class="hero-badge">MULTIPLAYER</span>
+          </button>
+        </div>
+
+        <!-- Secondary Navigation Strip -->
+        <div class="menu-secondary-bar">
+          <button id="menu-select-track-btn" class="menu-sub-btn interactive-btn glow-hover">
+            <span class="sub-icon">☰</span>
+            <span>TRACK: <b id="menu-track-title">STEREO BLITZ</b></span>
+          </button>
+          <button id="menu-meme-chaos-btn" class="menu-sub-btn interactive-btn glow-hover">
+            <span class="sub-icon">🤪</span>
+            <span>MEME CHAOS</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- 3. Multiplayer Lobby View (Wait Until Friends Join) -->
+      <div id="menu-lobby-view" class="start-lobby-view" style="display:none;">
+        <div class="lobby-panel-card">
+          <div class="lobby-top-strip">
+            <div class="lobby-title-col">
+              <h2>⚡ MULTIPLAYER RACE LOBBY</h2>
+              <div class="lobby-room-badge">
+                <span>ROOM:</span>
+                <span id="menu-lobby-room-code" class="code-highlight">DASH-4921</span>
+                <span id="menu-lobby-role-pill" class="role-pill">HOST</span>
+              </div>
+            </div>
+            <button id="menu-lobby-back-btn" class="minimal-pill interactive-btn">← BACK</button>
+          </div>
+
+          <!-- Invite Link Box -->
+          <div class="lobby-invite-box">
+            <div class="invite-top-info">
+              <span class="invite-icon">🔗</span>
+              <span>DIRECT INVITE LINK (CLICK TO COPY & SHARE):</span>
+            </div>
+            <div class="invite-link-row">
+              <input type="text" id="menu-lobby-link-input" class="invite-link-input" readonly />
+              <button id="menu-lobby-copy-btn" class="action-btn copy-link-btn interactive-btn">
+                📋 COPY INVITE LINK
+              </button>
+            </div>
+            <div class="invite-hint-note">
+              📱 Send this link to friends on <b>Discord, WhatsApp, or iMessage</b>. When they open it, they join this room instantly!
+            </div>
+          </div>
+
+          <!-- Live Racers Roster (Wait until friends join) -->
+          <div class="lobby-wait-section">
+            <div class="wait-header-row">
+              <div class="wait-status">
+                <span class="radar-dot pulse"></span>
+                <span id="menu-lobby-status-text">WAITING UNTIL FRIENDS JOIN...</span>
+              </div>
+              <div class="racer-count-capsule">
+                <span id="menu-lobby-player-count">1</span> / 8 RACERS
+              </div>
+            </div>
+
+            <div id="menu-lobby-roster" class="lobby-roster-grid">
+              <!-- Dynamically populated racer cards -->
+            </div>
+          </div>
+
+          <!-- Lobby Action Buttons -->
+          <div class="lobby-actions-footer">
+            <button id="menu-lobby-start-btn" class="action-btn start-race-btn pulse-glow interactive-btn">
+              🚀 START RACE (SYNCED 3..2..1)
+            </button>
+            <button id="menu-lobby-new-code-btn" class="minimal-pill interactive-btn" title="Generate New Room">
+              ↻ NEW ROOM
+            </button>
+          </div>
+        </div>
+      </div>
+
     </div>
   </div>
 

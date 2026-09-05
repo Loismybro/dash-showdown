@@ -71,7 +71,7 @@ class GameManager {
 
     // Timing & Game State
     this.lastTime = 0;
-    this.gameState = 'PLAYING'; // 'PLAYING', 'CRASHED', 'VICTORY'
+    this.gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'CRASHED', 'VICTORY'
     this.respawnTimer = 0;
 
     // Controls & Game Feel Juice: Jump Buffering & Coyote Time
@@ -97,7 +97,7 @@ class GameManager {
     this.renderer = new GameRenderer('canvas-container');
     this.renderer.init();
 
-    // 2. Bind Controls (Touch screen, Space, Click)
+    // 2. Bind Controls (Touch screen, Space, Click, Pause)
     this.bindControls();
 
     // 2b. Initialize WebRTC Peer-to-Peer Multiplayer
@@ -117,10 +117,14 @@ class GameManager {
       }
     });
 
-    // 4. Load First Level
+    // 4. Setup Start Screen & Pause Menu
+    this.setupStartScreen();
+    this.setupPauseMenu();
+
+    // 5. Load First Level (Track & 3D Scenery)
     this.loadLevel(0);
 
-    // 5. Start Game Loop
+    // 6. Start Game Loop
     this.lastTime = performance.now();
     requestAnimationFrame(t => this.gameLoop(t));
   }
@@ -148,6 +152,7 @@ class GameManager {
       partyBtn: document.getElementById('party-btn'),
       partyModeLabel: document.getElementById('party-mode-label'),
       partyCountBadge: document.getElementById('party-count-badge'),
+      pauseBtn: document.getElementById('pause-btn'),
       muteBtn: document.getElementById('mute-btn'),
       restartBtn: document.getElementById('restart-btn'),
 
@@ -213,7 +218,41 @@ class GameManager {
       testVineBoomBtn: document.getElementById('test-vine-boom-btn'),
       uploadTungTung: document.getElementById('upload-tung-tung'),
       uploadSmurfCat: document.getElementById('upload-smurf-cat'),
-      uploadCrash: document.getElementById('upload-crash')
+      uploadCrash: document.getElementById('upload-crash'),
+
+      // Pause Modal
+      pauseModal: document.getElementById('pause-modal'),
+      closePauseModal: document.getElementById('close-pause-modal'),
+      pauseTrackSub: document.getElementById('pause-track-sub'),
+      pauseResumeBtn: document.getElementById('pause-resume-btn'),
+      pauseRestartBtn: document.getElementById('pause-restart-btn'),
+      pausePracticeBtn: document.getElementById('pause-practice-btn'),
+      pausePracticeStatus: document.getElementById('pause-practice-status'),
+      pausePartyBtn: document.getElementById('pause-party-btn'),
+      pauseTracksBtn: document.getElementById('pause-tracks-btn'),
+      pauseTitleBtn: document.getElementById('pause-title-btn'),
+
+      // Starting Screen & Lobby
+      startScreenOverlay: document.getElementById('start-screen-overlay'),
+      mainMenuView: document.getElementById('main-menu-view'),
+      menuLobbyView: document.getElementById('menu-lobby-view'),
+      menuPlayerNameInput: document.getElementById('menu-player-name-input'),
+      menuCubePreview: document.getElementById('menu-cube-preview'),
+      menuPlaySoloBtn: document.getElementById('menu-play-solo-btn'),
+      menuPlayFriendsBtn: document.getElementById('menu-play-friends-btn'),
+      menuSelectTrackBtn: document.getElementById('menu-select-track-btn'),
+      menuTrackTitle: document.getElementById('menu-track-title'),
+      menuMemeChaosBtn: document.getElementById('menu-meme-chaos-btn'),
+      menuLobbyRoomCode: document.getElementById('menu-lobby-room-code'),
+      menuLobbyRolePill: document.getElementById('menu-lobby-role-pill'),
+      menuLobbyBackBtn: document.getElementById('menu-lobby-back-btn'),
+      menuLobbyLinkInput: document.getElementById('menu-lobby-link-input'),
+      menuLobbyCopyBtn: document.getElementById('menu-lobby-copy-btn'),
+      menuLobbyStatusText: document.getElementById('menu-lobby-status-text'),
+      menuLobbyPlayerCount: document.getElementById('menu-lobby-player-count'),
+      menuLobbyRoster: document.getElementById('menu-lobby-roster'),
+      menuLobbyStartBtn: document.getElementById('menu-lobby-start-btn'),
+      menuLobbyNewCodeBtn: document.getElementById('menu-lobby-new-code-btn')
     };
   }
 
@@ -257,8 +296,10 @@ class GameManager {
     // Initialize Party Ghosts
     this.setupGhosts();
 
-    // Start Procedural Music
-    audio.startMusic(this.level.bpm, this.level.theme);
+    // Start Procedural Music (only if race is active)
+    if (this.gameState === 'PLAYING') {
+      audio.startMusic(this.level.bpm, this.level.theme);
+    }
 
     // Update HUD
     this.updateHUDHeader();
@@ -564,7 +605,8 @@ class GameManager {
         this.closeSmurfCatModal();
         return;
       }
-      if (e.target.closest('.interactive-btn') || e.target.closest('.modal-card')) return;
+      if (this.gameState === 'MENU' || this.gameState === 'PAUSED') return;
+      if (e.target.closest('.interactive-btn') || e.target.closest('.modal-card') || e.target.closest('.start-screen-overlay')) return;
       this.player.isHolding = true;
       this.handleJumpPress();
     };
@@ -581,6 +623,26 @@ class GameManager {
     // Keyboard support
     window.addEventListener('keydown', (e) => {
       if (e.repeat) return;
+      if (e.code === 'Escape') {
+        if (this.gameState === 'PAUSED') {
+          this.resumeGame();
+        } else if (this.gameState === 'PLAYING') {
+          this.pauseGame();
+        }
+        return;
+      }
+      if (this.gameState === 'PAUSED') {
+        if (e.code === 'Space') {
+          this.resumeGame();
+        }
+        return;
+      }
+      if (this.gameState === 'MENU') {
+        if (e.code === 'Space' || e.code === 'Enter') {
+          this.startGameSolo();
+        }
+        return;
+      }
       if (this.gameState === 'SMURF_CAT') {
         this.closeSmurfCatModal();
         return;
@@ -1653,6 +1715,331 @@ class GameManager {
         <span class="party-slot-status">${m.isHost ? 'HOST' : 'READY'}</span>
       </div>
     `).join('');
+  // -------------------------------------------------------------
+  // PAUSE MENU & START SCREEN SYSTEMS
+  // -------------------------------------------------------------
+
+  setupPauseMenu() {
+    if (this.dom.pauseBtn) {
+      this.dom.pauseBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (this.gameState === 'PAUSED') {
+          this.resumeGame();
+        } else if (this.gameState === 'PLAYING') {
+          this.pauseGame();
+        }
+      });
+    }
+
+    if (this.dom.closePauseModal) {
+      this.dom.closePauseModal.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.resumeGame();
+      });
+    }
+
+    if (this.dom.pauseResumeBtn) {
+      this.dom.pauseResumeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.resumeGame();
+      });
+    }
+
+    if (this.dom.pauseRestartBtn) {
+      this.dom.pauseRestartBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.resumeGame();
+        this.resetPlayer(true);
+      });
+    }
+
+    if (this.dom.pausePracticeBtn) {
+      this.dom.pausePracticeBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.togglePracticeMode();
+        if (this.dom.pausePracticeStatus) {
+          this.dom.pausePracticeStatus.textContent = this.practiceMode ? 'ON' : 'OFF';
+          this.dom.pausePracticeStatus.style.color = this.practiceMode ? '#00FF88' : '#FF0055';
+        }
+      });
+    }
+
+    if (this.dom.pausePartyBtn) {
+      this.dom.pausePartyBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openPartyModal();
+      });
+    }
+
+    if (this.dom.pauseTracksBtn) {
+      this.dom.pauseTracksBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.openLevelModal();
+      });
+    }
+
+    if (this.dom.pauseTitleBtn) {
+      this.dom.pauseTitleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.returnToMainMenu();
+      });
+    }
+  }
+
+  pauseGame() {
+    if (this.gameState !== 'PLAYING') return;
+    this.gameState = 'PAUSED';
+    audio.pauseMusic();
+    if (this.dom.pauseModal) {
+      if (this.dom.pauseTrackSub) {
+        const pct = Math.min(100, Math.max(0, (this.player.x / this.level.endX) * 100));
+        this.dom.pauseTrackSub.textContent = `${this.level.name.toUpperCase()} • ${pct.toFixed(1)}% COMPLETED`;
+      }
+      if (this.dom.pausePracticeStatus) {
+        this.dom.pausePracticeStatus.textContent = this.practiceMode ? 'ON' : 'OFF';
+        this.dom.pausePracticeStatus.style.color = this.practiceMode ? '#00FF88' : '#FF0055';
+      }
+      this.dom.pauseModal.style.display = 'flex';
+    }
+  }
+
+  resumeGame() {
+    if (this.gameState !== 'PAUSED') return;
+    if (this.dom.pauseModal) {
+      this.dom.pauseModal.style.display = 'none';
+    }
+    this.gameState = 'PLAYING';
+    this.lastTime = performance.now();
+    audio.resumeMusic();
+  }
+
+  returnToMainMenu() {
+    if (this.dom.pauseModal) this.dom.pauseModal.style.display = 'none';
+    if (this.dom.partyModal) this.dom.partyModal.style.display = 'none';
+    if (this.dom.levelSelectModal) this.dom.levelSelectModal.style.display = 'none';
+    if (this.dom.memeChaosModal) this.dom.memeChaosModal.style.display = 'none';
+    if (this.dom.victoryModal) this.dom.victoryModal.style.display = 'none';
+    if (this.dom.smurfModal) this.dom.smurfModal.style.display = 'none';
+
+    audio.stopMusic();
+    this.resetPlayer(true);
+    this.gameState = 'MENU';
+
+    if (this.dom.startScreenOverlay) {
+      this.dom.startScreenOverlay.style.display = 'flex';
+      if (this.dom.mainMenuView) this.dom.mainMenuView.style.display = 'flex';
+      if (this.dom.menuLobbyView) this.dom.menuLobbyView.style.display = 'none';
+    }
+    if (this.dom.menuTrackTitle) {
+      this.dom.menuTrackTitle.textContent = this.level.name;
+    }
+  }
+
+  startGameSolo() {
+    if (this.dom.startScreenOverlay) {
+      this.dom.startScreenOverlay.style.display = 'none';
+    }
+    if (this.dom.pauseModal) {
+      this.dom.pauseModal.style.display = 'none';
+    }
+    this.gameState = 'PLAYING';
+    this.resetPlayer(true);
+    this.lastTime = performance.now();
+    audio.startMusic(this.level.bpm, this.level.theme);
+  }
+
+  setupStartScreen() {
+    const urlParams = new URLSearchParams(window.location.search);
+    const joinRoom = urlParams.get('room');
+
+    // Gamer Tag input
+    if (this.dom.menuPlayerNameInput && this.multiplayer) {
+      this.dom.menuPlayerNameInput.value = this.multiplayer.playerName;
+      this.dom.menuPlayerNameInput.addEventListener('input', (e) => {
+        const val = e.target.value.trim() || 'Player';
+        this.multiplayer.setProfile(val, this.multiplayer.playerColor);
+        if (this.dom.playerNameInput) this.dom.playerNameInput.value = val;
+      });
+    }
+
+    // Color swatches on start screen
+    document.querySelectorAll('#menu-color-swatches .color-swatch').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#menu-color-swatches .color-swatch').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const c = btn.getAttribute('data-color');
+        if (this.multiplayer) {
+          this.multiplayer.setProfile(this.multiplayer.playerName, c);
+        }
+        if (this.renderer && this.renderer.setPlayerColor) {
+          this.renderer.setPlayerColor(c);
+        }
+        if (this.dom.menuCubePreview) {
+          this.dom.menuCubePreview.style.background = c;
+          this.dom.menuCubePreview.style.boxShadow = `0 0 25px ${c}99`;
+        }
+      });
+    });
+
+    // Play Solo Button
+    if (this.dom.menuPlaySoloBtn) {
+      this.dom.menuPlaySoloBtn.addEventListener('click', () => {
+        this.startGameSolo();
+      });
+    }
+
+    // Play With Friends Button
+    if (this.dom.menuPlayFriendsBtn) {
+      this.dom.menuPlayFriendsBtn.addEventListener('click', () => {
+        this.openStartScreenLobby();
+      });
+    }
+
+    // Secondary Track Selection
+    if (this.dom.menuSelectTrackBtn) {
+      this.dom.menuSelectTrackBtn.addEventListener('click', () => {
+        this.openLevelModal();
+      });
+    }
+
+    // Secondary Meme Chaos
+    if (this.dom.menuMemeChaosBtn) {
+      this.dom.menuMemeChaosBtn.addEventListener('click', () => {
+        if (this.dom.memeChaosModal) this.dom.memeChaosModal.style.display = 'flex';
+      });
+    }
+
+    // Lobby Back Button
+    if (this.dom.menuLobbyBackBtn) {
+      this.dom.menuLobbyBackBtn.addEventListener('click', () => {
+        if (this.dom.mainMenuView) this.dom.mainMenuView.style.display = 'flex';
+        if (this.dom.menuLobbyView) this.dom.menuLobbyView.style.display = 'none';
+      });
+    }
+
+    // Lobby Copy Invite Link
+    if (this.dom.menuLobbyCopyBtn) {
+      this.dom.menuLobbyCopyBtn.addEventListener('click', () => {
+        const link = this.multiplayer ? this.multiplayer.getInviteLink() : window.location.href;
+        const fallback = () => {
+          if (this.dom.menuLobbyLinkInput) {
+            this.dom.menuLobbyLinkInput.select();
+            this.dom.menuLobbyLinkInput.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+          }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).catch(fallback);
+        } else {
+          fallback();
+        }
+        this.dom.menuLobbyCopyBtn.textContent = 'COPIED! ✓';
+        this.dom.menuLobbyCopyBtn.style.background = '#00ff88';
+        this.triggerBrainrotPop("link", "LINK COPIED! 🎮", "SHARE WITH FRIENDS ON DISCORD / WHATSAPP");
+        setTimeout(() => {
+          if (this.dom.menuLobbyCopyBtn) {
+            this.dom.menuLobbyCopyBtn.textContent = '📋 COPY INVITE LINK';
+            this.dom.menuLobbyCopyBtn.style.background = '';
+          }
+        }, 2200);
+      });
+    }
+
+    // Lobby New Room Code
+    if (this.dom.menuLobbyNewCodeBtn) {
+      this.dom.menuLobbyNewCodeBtn.addEventListener('click', () => {
+        const newCode = 'DASH-' + Math.floor(1000 + Math.random() * 9000);
+        if (this.multiplayer) {
+          this.multiplayer.startHost(newCode);
+          this.updateLobbyDisplay();
+        }
+      });
+    }
+
+    // Lobby Start Race
+    if (this.dom.menuLobbyStartBtn) {
+      this.dom.menuLobbyStartBtn.addEventListener('click', () => {
+        if (this.multiplayer) {
+          this.multiplayer.requestStartRace();
+        } else {
+          this.startGameSolo();
+        }
+      });
+    }
+
+    // If visiting with an invite link (?room=ROOM_CODE), directly open lobby screen
+    if (joinRoom && joinRoom.trim() !== '') {
+      this.openStartScreenLobby();
+    }
+  }
+
+  openStartScreenLobby() {
+    if (this.dom.mainMenuView) this.dom.mainMenuView.style.display = 'none';
+    if (this.dom.menuLobbyView) this.dom.menuLobbyView.style.display = 'block';
+    this.updateLobbyDisplay();
+    this.renderMenuLobbyRoster();
+  }
+
+  updateLobbyDisplay() {
+    if (!this.multiplayer) return;
+    if (this.dom.menuLobbyRoomCode) {
+      this.dom.menuLobbyRoomCode.textContent = this.multiplayer.roomCode;
+    }
+    if (this.dom.menuLobbyRolePill) {
+      this.dom.menuLobbyRolePill.textContent = this.multiplayer.isHost ? 'HOST' : 'CLIENT';
+      this.dom.menuLobbyRolePill.style.background = this.multiplayer.isHost ? '#00FF88' : '#00F0FF';
+    }
+    if (this.dom.menuLobbyLinkInput) {
+      this.dom.menuLobbyLinkInput.value = this.multiplayer.getInviteLink();
+    }
+    if (this.dom.partyShareUrl) {
+      this.dom.partyShareUrl.value = this.multiplayer.getInviteLink();
+    }
+  }
+
+  renderMenuLobbyRoster(playersList) {
+    if (!this.dom.menuLobbyRoster) return;
+    const players = playersList || (this.multiplayer ? Array.from(this.multiplayer.players.values()) : []);
+    const count = players.length;
+
+    if (this.dom.menuLobbyPlayerCount) {
+      this.dom.menuLobbyPlayerCount.textContent = count;
+    }
+    if (this.dom.menuLobbyStatusText) {
+      if (this.multiplayer && !this.multiplayer.isHost) {
+        this.dom.menuLobbyStatusText.textContent = "CONNECTED • WAITING FOR HOST TO START RACE...";
+      } else if (count > 1) {
+        this.dom.menuLobbyStatusText.textContent = `${count} FRIENDS IN ROOM • READY TO RACE!`;
+      } else {
+        this.dom.menuLobbyStatusText.textContent = "WAITING UNTIL FRIENDS JOIN...";
+      }
+    }
+
+    const slots = [];
+    players.forEach(p => {
+      slots.push(`
+        <div class="lobby-roster-slot">
+          <div class="slot-avatar-circle" style="background:${p.colorHex}22; border-color:${p.colorHex}; color:${p.colorHex};">
+            ${p.isHost ? '👑' : '🎮'}
+          </div>
+          <div class="slot-name-text">${p.name}</div>
+          <span class="slot-status-pill ${p.isHost ? 'host' : 'ready'}">${p.isHost ? 'HOST' : 'READY'}</span>
+        </div>
+      `);
+    });
+
+    const emptyNeeded = Math.max(1, 6 - count);
+    for (let i = 0; i < emptyNeeded; i++) {
+      slots.push(`
+        <div class="lobby-roster-slot empty-slot">
+          <div class="empty-avatar-circle">?</div>
+          <div class="slot-name-text">Waiting...</div>
+          <span class="slot-status-pill">OPEN</span>
+        </div>
+      `);
+    }
+
+    this.dom.menuLobbyRoster.innerHTML = slots.join('');
   }
 
   onMultiplayerRosterUpdated(playersList) {
@@ -1660,6 +2047,7 @@ class GameManager {
       this.dom.partyCountBadge.textContent = playersList.length;
     }
     this.renderPartyModalMembers();
+    this.renderMenuLobbyRoster(playersList);
 
     const opponents = playersList.filter(p => !p.isPlayer);
     const botFill = this.partyRoster.slice(1, 4).filter(b => !opponents.some(o => o.name === b.name));
@@ -1695,6 +2083,15 @@ class GameManager {
   }
 
   triggerSyncedCountdown(startTime) {
+    if (this.dom.startScreenOverlay) {
+      this.dom.startScreenOverlay.style.display = 'none';
+    }
+    if (this.dom.pauseModal) {
+      this.dom.pauseModal.style.display = 'none';
+    }
+    this.closePartyModal();
+    this.closeLevelModal();
+
     if (!this.dom.raceCountdownOverlay) return;
 
     this.dom.raceCountdownOverlay.style.display = 'flex';
@@ -1724,6 +2121,7 @@ class GameManager {
         audio.playGoBeep();
         this.gameState = 'PLAYING';
         this.resetPlayer(true);
+        audio.startMusic(this.level.bpm, this.level.theme);
       } else {
         clearInterval(interval);
         if (this.dom.raceCountdownOverlay) {
@@ -1742,6 +2140,9 @@ class GameManager {
     this.dom.diffBadge.style.border = `1px solid ${this.level.diffColor}`;
     this.dom.attemptCount.innerHTML = `ATTEMPT <span>${this.attempts}</span>`;
     this.dom.bestRecord.innerHTML = `BEST <span>${this.bestScores[this.currentLevelIndex]}%</span>`;
+    if (this.dom.menuTrackTitle) {
+      this.dom.menuTrackTitle.textContent = this.level.name;
+    }
     this.updateGemHUD();
   }
 
@@ -1752,6 +2153,40 @@ class GameManager {
   gameLoop(currentTime) {
     const dt = Math.min(0.05, (currentTime - this.lastTime) / 1000);
     this.lastTime = currentTime;
+
+    // A. Main Menu State: Gently drift ambient 3D camera without gameplay physics
+    if (this.gameState === 'MENU') {
+      this.renderer.update({
+        x: 0,
+        y: (this.player.vehicleMode === 'cube' ? 0.5 : 0),
+        vy: 0,
+        rotationZ: 0,
+        vehicleMode: this.player.vehicleMode,
+        gravityDir: 1,
+        isGrounded: true,
+        isAlive: true,
+        isThrusting: false
+      }, dt * 0.35);
+      requestAnimationFrame(t => this.gameLoop(t));
+      return;
+    }
+
+    // B. Paused State: Freeze game loop & animations in place
+    if (this.gameState === 'PAUSED') {
+      this.renderer.update({
+        x: this.player.x,
+        y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
+        vy: 0,
+        rotationZ: this.player.rotationZ,
+        vehicleMode: this.player.vehicleMode,
+        gravityDir: this.player.gravityDir,
+        isGrounded: this.player.isGrounded,
+        isAlive: this.player.isAlive,
+        isThrusting: false
+      }, 0);
+      requestAnimationFrame(t => this.gameLoop(t));
+      return;
+    }
 
     // 1. Update Player Physics & Collisions
     this.updatePhysics(dt);

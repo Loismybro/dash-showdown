@@ -214,6 +214,23 @@ class AudioManager {
     this.stopShipHum();
   }
 
+  pauseMusic() {
+    this.isPlaying = false;
+    if (this.timerID) {
+      clearInterval(this.timerID);
+      this.timerID = null;
+    }
+    this.stopShipHum();
+  }
+
+  resumeMusic() {
+    if (this.muted || !this.ctx) return;
+    this.isPlaying = true;
+    this.nextNoteTime = this.ctx.currentTime + 0.05;
+    if (this.timerID) clearInterval(this.timerID);
+    this.timerID = setInterval(() => this.scheduler(), this.lookahead);
+  }
+
   scheduler() {
     if (!this.isPlaying || !this.ctx) return;
     while (this.nextNoteTime < this.ctx.currentTime + this.scheduleAheadTime) {
