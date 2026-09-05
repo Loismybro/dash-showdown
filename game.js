@@ -103,6 +103,9 @@ class GameManager {
     // 2b. Initialize WebRTC Peer-to-Peer Multiplayer
     this.multiplayer = new MultiplayerManager(this);
     this.multiplayer.init();
+    if (this.dom.partyShareUrl) {
+      this.dom.partyShareUrl.value = this.multiplayer.getInviteLink();
+    }
     if (this.renderer) {
       this.renderer.setPlayerColor(this.multiplayer.playerColor);
     }
@@ -202,6 +205,10 @@ class GameManager {
       closeMemeChaosModal: document.getElementById('close-meme-chaos-modal'),
       summonTungTungBtn: document.getElementById('summon-tung-tung-btn'),
       summonSmurfCatBtn: document.getElementById('summon-smurf-cat-btn'),
+      summonSigmaBtn: document.getElementById('summon-sigma-btn'),
+      summonGigachadBtn: document.getElementById('summon-gigachad-btn'),
+      summonEmotionalBtn: document.getElementById('summon-emotional-btn'),
+      summonSkibidiBtn: document.getElementById('summon-skibidi-btn'),
       testMetalPipeBtn: document.getElementById('test-metal-pipe-btn'),
       testVineBoomBtn: document.getElementById('test-vine-boom-btn'),
       uploadTungTung: document.getElementById('upload-tung-tung'),
@@ -236,6 +243,14 @@ class GameManager {
     // Reset Player
     this.resetPlayer(true);
 
+    // If hosting multiplayer, synchronize level across connected friends
+    if (this.multiplayer && this.multiplayer.isHost) {
+      this.multiplayer.broadcast({
+        type: 'level_change',
+        levelIndex: index
+      });
+    }
+
     // Build 3D Track & Obstacles (and Scenery)
     this.renderer.buildTrack(this.level);
 
@@ -252,6 +267,11 @@ class GameManager {
   }
 
   setupGhosts() {
+    if (this.multiplayer && this.multiplayer.players && this.multiplayer.players.size > 1) {
+      this.onMultiplayerRosterUpdated(Array.from(this.multiplayer.players.values()));
+      return;
+    }
+
     if (this.partyMode === 'solo') {
       this.ghostConfigs = [];
     } else if (this.partyMode === 'duo') {
@@ -266,6 +286,7 @@ class GameManager {
       id: cfg.id,
       name: cfg.name,
       colorHex: cfg.colorHex,
+      isBot: true,
       x: 0,
       y: 0,
       vy: 0,
@@ -652,11 +673,17 @@ class GameManager {
     if (this.dom.partyCopyLinkBtn) {
       this.dom.partyCopyLinkBtn.addEventListener('click', () => {
         const link = this.multiplayer ? this.multiplayer.getInviteLink() : window.location.href;
-        if (navigator.clipboard) {
-          navigator.clipboard.writeText(link);
-        } else if (this.dom.partyShareUrl) {
-          this.dom.partyShareUrl.select();
-          document.execCommand('copy');
+        const fallbackCopy = () => {
+          if (this.dom.partyShareUrl) {
+            this.dom.partyShareUrl.select();
+            this.dom.partyShareUrl.setSelectionRange(0, 99999);
+            document.execCommand('copy');
+          }
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(link).catch(fallbackCopy);
+        } else {
+          fallbackCopy();
         }
         this.dom.partyCopyLinkBtn.textContent = 'COPIED! ✓';
         this.dom.partyCopyLinkBtn.style.background = '#00ff88';
@@ -775,6 +802,53 @@ class GameManager {
       });
     }
 
+    if (this.dom.summonSigmaBtn) {
+      this.dom.summonSigmaBtn.addEventListener('click', () => {
+        audio.playWhatTheSigma();
+        if (this.renderer) {
+          this.renderer.faceExpression = 'sigma';
+          setTimeout(() => { if (this.renderer) this.renderer.faceExpression = 'normal'; }, 2200);
+          this.renderer.triggerComicHitText(this.player.x, this.player.y + 1.2, "WHAT THE SIGMA?! 🗿", "#FFD000");
+        }
+        this.triggerBrainrotPop("sigma", "WHAT THE SIGMA?!", "MAXIMUM MEWING UNLOCKED! +10,000 AURA 🗿");
+      });
+    }
+
+    if (this.dom.summonGigachadBtn) {
+      this.dom.summonGigachadBtn.addEventListener('click', () => {
+        audio.playGigachad();
+        if (this.renderer) {
+          this.renderer.faceExpression = 'gigachad';
+          setTimeout(() => { if (this.renderer) this.renderer.faceExpression = 'normal'; }, 2500);
+          this.renderer.triggerComicHitText(this.player.x, this.player.y + 1.2, "BYE BYE! 🤫🧏‍♂️", "#FF007F");
+        }
+        this.triggerBrainrotPop("chad", "GIGACHAD AURA", "CAN YOU FEEL MY HEART 🔥 +50,000 AURA");
+      });
+    }
+
+    if (this.dom.summonEmotionalBtn) {
+      this.dom.summonEmotionalBtn.addEventListener('click', () => {
+        audio.playEmotionalDamage();
+        if (this.renderer) {
+          this.renderer.faceExpression = 'bonked';
+          setTimeout(() => { if (this.renderer) this.renderer.faceExpression = 'normal'; }, 1800);
+          this.renderer.triggerComicHitText(this.player.x, this.player.y + 1.2, "EMOTIONAL DAMAGE! 💔", "#FF0055");
+        }
+        this.triggerBrainrotPop("damage", "EMOTIONAL DAMAGE", "THAT WAS A CRITICAL HIT 💀");
+      });
+    }
+
+    if (this.dom.summonSkibidiBtn) {
+      this.dom.summonSkibidiBtn.addEventListener('click', () => {
+        audio.playSkibidi();
+        if (this.renderer) {
+          this.renderer.triggerComicHitText(this.player.x, this.player.y + 1.2, "SKIBIDI RIZZ! 🚽", "#00FF88");
+          this.renderer.triggerShockwave(this.player.x, this.player.y, 0x00ff88, 3.0);
+        }
+        this.triggerBrainrotPop("skibidi", "SKIBIDI RIZZ", "UNSPOKEN RIZZ OVERLOAD! +5,000 AURA 🔥");
+      });
+    }
+
     if (this.dom.testMetalPipeBtn) {
       this.dom.testMetalPipeBtn.addEventListener('click', () => {
         audio.playMetalPipe();
@@ -792,6 +866,19 @@ class GameManager {
         }
       });
     }
+
+    // Meme Accessory Buttons
+    document.querySelectorAll('.meme-acc-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.meme-acc-btn').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        const acc = btn.getAttribute('data-acc');
+        if (this.renderer) {
+          this.renderer.setMemeAccessory(acc);
+        }
+        this.triggerBrainrotPop("acc", "ACCESSORY EQUIPPED", `${acc.toUpperCase()} EQUIPPED! ✨`);
+      });
+    });
 
     // Chaos Frequency Toggle Buttons
     document.querySelectorAll('.chaos-freq-btn').forEach(btn => {
@@ -1355,6 +1442,11 @@ class GameManager {
 
   updateGhosts(dt) {
     this.ghostStates.forEach(g => {
+      // If this is a connected human player, their position and rotation are driven by WebRTC
+      if (!g.isBot) {
+        return;
+      }
+
       if (!g.isAlive) {
         g.respawnTimer -= dt;
         if (g.respawnTimer <= 0) {
@@ -1571,7 +1663,10 @@ class GameManager {
 
     const opponents = playersList.filter(p => !p.isPlayer);
     const botFill = this.partyRoster.slice(1, 4).filter(b => !opponents.some(o => o.name === b.name));
-    const allOpponents = [...opponents, ...botFill.slice(0, Math.max(0, 3 - opponents.length))];
+    const allOpponents = [
+      ...opponents.map(p => ({ ...p, isBot: false })),
+      ...botFill.slice(0, Math.max(0, 3 - opponents.length)).map(b => ({ ...b, isBot: true }))
+    ];
 
     this.ghostConfigs = allOpponents;
     this.ghostStates = this.ghostConfigs.map(cfg => ({
@@ -1579,6 +1674,7 @@ class GameManager {
       name: cfg.name,
       colorHex: cfg.colorHex,
       color: cfg.color || parseInt((cfg.colorHex || '#FF007F').replace('#', '0x'), 16),
+      isBot: cfg.isBot,
       x: 0,
       y: 0,
       vy: 0,
@@ -1697,7 +1793,7 @@ class GameManager {
       const progress = Math.min(100, Math.max(0, (this.player.x / this.level.endX) * 100));
       this.multiplayer.sendLocalTransform(
         this.player.x,
-        this.player.y,
+        this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
         this.player.vy,
         this.player.rotationZ,
         this.player.vehicleMode,

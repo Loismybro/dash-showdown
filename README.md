@@ -11,12 +11,12 @@ No servers or account logins required! Built with WebRTC peer-to-peer architectu
 1. **Host a Room**:
    - Open the game in any web browser.
    - Click the **`👥 INVITE FRIENDS`** button in the top bar.
-   - Click **`📋 COPY INVITE LINK`** (e.g. `https://mognetic.github.io/dash-showdown/?room=DASH-4921`).
+   - Click **`📋 COPY INVITE LINK`** (e.g. `https://loismybro.github.io/dash-showdown/?room=DASH-4921`).
 2. **Invite Friends**:
    - Send the copied link to your friends on **Discord, WhatsApp, Telegram, or iMessage**.
    - Your friends click the link on their phone, iPad, laptop, or PC to instantly join your room!
 3. **Customize Your Tag & Cube**:
-   - Enter your **Gamer Tag** (e.g. *Mognetic*, *SpeedDemon*).
+   - Enter your **Gamer Tag** (e.g. *Loismybro*, *SpeedDemon*).
    - Pick your favorite neon cube color (Mint Volt, Cyber Cyan, Hot Pink, Solar Gold, Neon Violet, Inferno Red).
 4. **Launch the Synced Race**:
    - When everyone is in the lobby, click **`🚀 START RACE`**!
@@ -50,7 +50,7 @@ No servers or account logins required! Built with WebRTC peer-to-peer architectu
    👉 [github.com/new](https://github.com/new) named `dash-showdown` (or any name you like).
 2. Push this repository to GitHub:
    ```bash
-   git remote add origin https://github.com/Mognetic/dash-showdown.git
+   git remote add origin https://github.com/Loismybro/dash-showdown.git
    git branch -M main
    git push -u origin main
    ```
@@ -59,7 +59,7 @@ No servers or account logins required! Built with WebRTC peer-to-peer architectu
    - Under **Build and deployment** > **Source**, choose **Deploy from a branch**.
    - Select **Branch**: `main`, Folder: `/ (root)`, and click **Save**.
 4. In about 30 seconds, your game is live at:
-   👉 `https://mognetic.github.io/dash-showdown/`
+   👉 `https://loismybro.github.io/dash-showdown/`
    Send the link to friends and play together anytime!
 
 ---

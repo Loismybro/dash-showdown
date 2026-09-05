@@ -713,6 +713,98 @@ class AudioManager {
     return this.playMemeClip('what_the_sigma', volume);
   }
 
+  // 💪 Gigachad "Can You Feel My Heart" Synth Riff
+  playGigachad(volume = 0.95) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [
+      { f: 329.63, t: 0, d: 0.22 },
+      { f: 392.00, t: 0.24, d: 0.22 },
+      { f: 369.99, t: 0.48, d: 0.22 },
+      { f: 329.63, t: 0.72, d: 0.48 }
+    ];
+    notes.forEach(n => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      osc.frequency.setValueAtTime(n.f, now + n.t);
+      gain.gain.setValueAtTime(volume * 0.7, now + n.t);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+      osc.connect(gain);
+      gain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+      osc.start(now + n.t);
+      osc.stop(now + n.t + n.d + 0.05);
+    });
+    const sub = this.ctx.createOscillator();
+    const sGain = this.ctx.createGain();
+    sub.type = 'sine';
+    sub.frequency.setValueAtTime(80, now);
+    sub.frequency.exponentialRampToValueAtTime(35, now + 0.8);
+    sGain.gain.setValueAtTime(volume, now);
+    sGain.gain.exponentialRampToValueAtTime(0.001, now + 0.85);
+    sub.connect(sGain);
+    sGain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    sub.start(now);
+    sub.stop(now + 0.9);
+  }
+
+  // 💔 "Emotional Damage!" Comedic Vocal / Impact SFX
+  playEmotionalDamage(volume = 0.95) {
+    if (this.muted) return;
+    this.init();
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      try {
+        const u = new SpeechSynthesisUtterance("Emotional Damage!");
+        u.pitch = 1.4;
+        u.rate = 1.25;
+        u.volume = Math.min(1.0, volume);
+        window.speechSynthesis.speak(u);
+      } catch (e) {}
+    }
+    if (this.ctx) {
+      const now = this.ctx.currentTime;
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(880, now);
+      osc.frequency.exponentialRampToValueAtTime(110, now + 0.45);
+      gain.gain.setValueAtTime(volume * 0.75, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.48);
+      osc.connect(gain);
+      gain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+      osc.start(now);
+      osc.stop(now + 0.5);
+    }
+  }
+
+  // 🚽 Skibidi Bouncy Phonk Riff
+  playSkibidi(volume = 0.9) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+    const now = this.ctx.currentTime;
+    const notes = [
+      { f: 220, t: 0, d: 0.12 },
+      { f: 220, t: 0.14, d: 0.12 },
+      { f: 261.63, t: 0.28, d: 0.14 },
+      { f: 293.66, t: 0.44, d: 0.25 }
+    ];
+    notes.forEach(n => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'square';
+      osc.frequency.setValueAtTime(n.f, now + n.t);
+      gain.gain.setValueAtTime(volume * 0.6, now + n.t);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + n.t + n.d);
+      osc.connect(gain);
+      gain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+      osc.start(now + n.t);
+      osc.stop(now + n.t + n.d + 0.05);
+    });
+  }
+
   // Register user custom meme audio file (MP3/WAV)
   registerCustomAudio(key, fileOrUrl) {
     try {

@@ -2,6 +2,26 @@
 
 import { SceneryManager } from './scenery.js';
 
+// Polyfill CanvasRenderingContext2D.prototype.roundRect for cross-platform support (iOS/older Safari)
+if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D.prototype.roundRect) {
+  CanvasRenderingContext2D.prototype.roundRect = function(x, y, w, h, r = 0) {
+    let radius = typeof r === 'number' ? [r, r, r, r] : r;
+    const [tl, tr, br, bl] = radius;
+    this.beginPath();
+    this.moveTo(x + tl, y);
+    this.lineTo(x + w - tr, y);
+    this.quadraticCurveTo(x + w, y, x + w, y + tr);
+    this.lineTo(x + w, y + h - br);
+    this.quadraticCurveTo(x + w, y + h, x + w - br, y + h);
+    this.lineTo(x + bl, y + h);
+    this.quadraticCurveTo(x, y + h, x, y + h - bl);
+    this.lineTo(x, y + tl);
+    this.quadraticCurveTo(x, y, x + tl, y);
+    this.closePath();
+    return this;
+  };
+}
+
 export class GameRenderer {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
@@ -301,7 +321,8 @@ export class GameRenderer {
 
       // 3. Razor-Sharp Saturated Glowing Neon Bevel Wireframe
       const wireGeo = new THREE.EdgesGeometry(coneGeo);
-      const wireColor = obs.dir === "down" ? 0xff0055 : 0x00f0ff;
+      const isGothicSpike = (this.currentLevel && this.currentLevel.themeType === 'gothic');
+      const wireColor = obs.dir === "down" ? 0xff0055 : (isGothicSpike ? 0xff0055 : 0x00f0ff);
       const wireMat = new THREE.LineBasicMaterial({ color: wireColor, linewidth: 2.5 });
       const wire = new THREE.LineSegments(wireGeo, wireMat);
       cone.add(wire);
@@ -333,27 +354,52 @@ export class GameRenderer {
       this.obstaclesGroup.add(spikeGroup);
     }
     else if (type === "block") {
-      // Solid Neon Block with Glowing Bevel Edges
+      // Themed Track Block with Gothic Ramparts or Neon Edges
       const w = obs.w || 2;
       const h = obs.h || 2;
+      const isGothic = (this.currentLevel && this.currentLevel.themeType === 'gothic');
+      const isFairyland = (this.currentLevel && this.currentLevel.themeType === 'fairyland');
+      const isShark = (this.currentLevel && this.currentLevel.themeType === 'shark');
+      
+      const themeBlockColor = isGothic ? 0x14081c : 0x090d18;
+      const themeWireColor = isGothic ? 0xff0055 : (isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9));
+
       const geo = new THREE.BoxGeometry(w, h, 2.2);
       const mat = new THREE.MeshStandardMaterial({
-        color: 0x090d18,
-        roughness: 0.25,
-        metalness: 0.85
+        color: themeBlockColor,
+        roughness: isGothic ? 0.45 : 0.25,
+        metalness: isGothic ? 0.75 : 0.85
       });
       const block = new THREE.Mesh(geo, mat);
 
       const wireGeo = new THREE.EdgesGeometry(geo);
-      const wireMat = new THREE.LineBasicMaterial({ color: 0x00ff88, linewidth: 2 });
+      const wireMat = new THREE.LineBasicMaterial({ color: themeWireColor, linewidth: 2 });
       block.add(new THREE.LineSegments(wireGeo, wireMat));
 
-      // Inner glowing cyber pattern
+      // Inner glowing pattern / gothic masonry rune
       const innerGeo = new THREE.PlaneGeometry(w * 0.75, h * 0.75);
-      const innerMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, transparent: true, opacity: 0.15 });
+      const innerMat = new THREE.MeshBasicMaterial({ color: themeWireColor, transparent: true, opacity: 0.15 });
       const inner = new THREE.Mesh(innerGeo, innerMat);
       inner.position.z = 1.11;
       block.add(inner);
+
+      // Gothic Castle Battlement Crenellations on top of rampart blocks
+      if (isGothic && h >= 1.5 && w >= 3) {
+        const crenCount = Math.floor(w / 1.5);
+        for (let cr = 0; cr < crenCount; cr += 2) {
+          const cren = new THREE.Mesh(
+            new THREE.BoxGeometry(0.7, 0.45, 2.22),
+            new THREE.MeshStandardMaterial({ color: 0x220c30, roughness: 0.5 })
+          );
+          cren.position.set(-w / 2 + 0.5 + cr * 1.5, h / 2 + 0.22, 0);
+          const crenWire = new THREE.LineSegments(
+            new THREE.EdgesGeometry(cren.geometry),
+            new THREE.LineBasicMaterial({ color: 0xff0055, linewidth: 1.5 })
+          );
+          cren.add(crenWire);
+          block.add(cren);
+        }
+      }
 
       block.position.set(x + w / 2, y + h / 2, 0);
       this.obstaclesGroup.add(block);
@@ -671,6 +717,63 @@ export class GameRenderer {
     this.smurfCatHalo.visible = false;
     this.cubeMesh.add(this.smurfCatHalo);
 
+    // 🍄 Smurf Cat Mushroom Cap Hat
+    const mushGroup = new THREE.Group();
+    const mCap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.52, 16, 12, 0, Math.PI * 2, 0, Math.PI * 0.55),
+      new THREE.MeshStandardMaterial({ color: 0x0091ff, roughness: 0.25 })
+    );
+    mCap.rotation.x = Math.PI;
+    mushGroup.add(mCap);
+    // White polka dots
+    for (let p = 0; p < 5; p++) {
+      const dot = new THREE.Mesh(
+        new THREE.SphereGeometry(0.12, 8, 8),
+        new THREE.MeshBasicMaterial({ color: 0xffffff })
+      );
+      dot.position.set(Math.sin(p * 1.3) * 0.35, -0.2, Math.cos(p * 1.3) * 0.35);
+      mushGroup.add(dot);
+    }
+    mushGroup.position.set(0, 0.95, 0);
+    mushGroup.visible = false;
+    this.mushroomCap = mushGroup;
+    this.cubeMesh.add(this.mushroomCap);
+
+    // 👑 Skibidi Golden Crown
+    const crownGroup = new THREE.Group();
+    const crownBase = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.42, 0.38, 0.28, 5, 1),
+      new THREE.MeshStandardMaterial({ color: 0xffd700, metalness: 0.85, roughness: 0.2 })
+    );
+    crownGroup.add(crownBase);
+    // Ruby jewels on crown tips
+    for (let r = 0; r < 5; r++) {
+      const ruby = new THREE.Mesh(
+        new THREE.SphereGeometry(0.08, 6, 6),
+        new THREE.MeshBasicMaterial({ color: 0xff0055 })
+      );
+      ruby.position.set(Math.sin(r * Math.PI * 0.4) * 0.42, 0.16, Math.cos(r * Math.PI * 0.4) * 0.42);
+      crownGroup.add(ruby);
+    }
+    crownGroup.position.set(0, 0.72, 0);
+    crownGroup.visible = false;
+    this.goldenCrown = crownGroup;
+    this.cubeMesh.add(this.goldenCrown);
+
+    // 🕶️ Gigachad Aviator Shades
+    const shadesGroup = new THREE.Group();
+    const lensMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0a });
+    const lensL = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), lensMat);
+    lensL.position.set(-0.2, 0.08, 0.55);
+    const lensR = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.18, 0.08), lensMat);
+    lensR.position.set(0.2, 0.08, 0.55);
+    const bridge = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.04, 0.08), new THREE.MeshBasicMaterial({ color: 0xffd700 }));
+    bridge.position.set(0, 0.12, 0.55);
+    shadesGroup.add(lensL); shadesGroup.add(lensR); shadesGroup.add(bridge);
+    shadesGroup.visible = false;
+    this.gigachadShades = shadesGroup;
+    this.cubeMesh.add(this.gigachadShades);
+
     this.playerGroup.add(this.cubeMesh);
 
     // ── 2. HIGH-PERFORMANCE AERODYNAMIC JET FIGHTER SHIP RIG ──
@@ -893,6 +996,46 @@ export class GameRenderer {
       ctx.beginPath();
       ctx.arc(136, 185, 14, 0, Math.PI);
       ctx.fill();
+      return;
+    }
+
+    if (expr === 'sigma') {
+      // 🗿 Sigma raised eyebrow & intense mewing gaze
+      ctx.lineWidth = 6;
+      ctx.strokeStyle = "#ffd000";
+      // Left high raised eyebrow
+      ctx.beginPath(); ctx.moveTo(54, 82); ctx.lineTo(106, 70); ctx.stroke();
+      // Right furrowed eyebrow
+      ctx.beginPath(); ctx.moveTo(150, 96); ctx.lineTo(202, 106); ctx.stroke();
+      // Narrow squinting eyes
+      ctx.fillStyle = "#ffd000";
+      ctx.fillRect(66, 108, 32, 18);
+      ctx.fillRect(158, 114, 32, 16);
+      // Chiseled mewing smirk line
+      ctx.beginPath();
+      ctx.moveTo(96, 172);
+      ctx.lineTo(138, 176);
+      ctx.lineTo(168, 164);
+      ctx.stroke();
+      return;
+    }
+
+    if (expr === 'gigachad') {
+      // 💪 Gigachad chiseled jawline & dark aviator shades
+      ctx.fillStyle = "#ff007f";
+      ctx.fillRect(52, 102, 60, 36);
+      ctx.fillRect(144, 102, 60, 36);
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(52, 102, 60, 36);
+      ctx.strokeRect(144, 102, 60, 36);
+      ctx.beginPath(); ctx.moveTo(112, 114); ctx.lineTo(144, 114); ctx.stroke();
+      // Gigachad chiseled jawline smile
+      ctx.strokeStyle = "#ffffff";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(88, 174); ctx.lineTo(128, 184); ctx.lineTo(168, 174);
+      ctx.stroke();
       return;
     }
 
@@ -1894,8 +2037,17 @@ export class GameRenderer {
   setSmurfCatAura(enabled) {
     this.smurfCatAuraActive = enabled;
     if (this.smurfCatHalo) {
-      this.smurfCatHalo.visible = enabled;
+      this.smurfCatHalo.visible = enabled || (this.currentAccessory === 'halo');
     }
+  }
+
+  // Set Meme Accessory on Player Cube (mushroom, crown, shades, halo, none)
+  setMemeAccessory(name) {
+    this.currentAccessory = name;
+    if (this.smurfCatHalo) this.smurfCatHalo.visible = (name === 'halo' || this.smurfCatAuraActive);
+    if (this.mushroomCap) this.mushroomCap.visible = (name === 'mushroom');
+    if (this.goldenCrown) this.goldenCrown.visible = (name === 'crown');
+    if (this.gigachadShades) this.gigachadShades.visible = (name === 'shades');
   }
 
   // Dynamically change local player's cube color

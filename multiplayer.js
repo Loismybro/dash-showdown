@@ -99,7 +99,10 @@ export class MultiplayerManager {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
           ]
         }
       });
@@ -175,7 +178,10 @@ export class MultiplayerManager {
         config: {
           iceServers: [
             { urls: 'stun:stun.l.google.com:19302' },
-            { urls: 'stun:stun1.l.google.com:19302' }
+            { urls: 'stun:stun1.l.google.com:19302' },
+            { urls: 'stun:stun2.l.google.com:19302' },
+            { urls: 'stun:stun3.l.google.com:19302' },
+            { urls: 'stun:stun4.l.google.com:19302' }
           ]
         }
       });
@@ -269,6 +275,17 @@ export class MultiplayerManager {
         p.isAlive = msg.isAlive;
         p.progress = msg.progress || 0;
 
+        // Keep game ghostStates synchronized for live leaderboard ranking
+        if (this.game && this.game.ghostStates) {
+          const gs = this.game.ghostStates.find(item => item.id === msg.id);
+          if (gs) {
+            gs.x = msg.x;
+            gs.y = msg.y;
+            gs.rotationZ = msg.rot;
+            gs.isAlive = msg.isAlive;
+          }
+        }
+
         if (this.game.renderer) {
           this.game.renderer.updateGhost(msg.id, msg.x, msg.y, msg.rot, msg.isAlive);
         }
@@ -276,6 +293,10 @@ export class MultiplayerManager {
       this.broadcastToOthers(conn.peer, msg);
     }
     else if (msg.type === 'crash') {
+      if (this.game && this.game.ghostStates) {
+        const gs = this.game.ghostStates.find(item => item.id === msg.id);
+        if (gs) gs.isAlive = false;
+      }
       if (this.game.renderer && this.game.renderer.triggerDeathExplosion) {
         const color = this.players.get(msg.id)?.colorHex || '#FF0055';
         this.game.renderer.triggerDeathExplosion(new THREE.Vector3(msg.x, msg.y, 0), color);
@@ -335,6 +356,18 @@ export class MultiplayerManager {
           p.rot = msg.rot;
           p.isAlive = msg.isAlive;
           p.progress = msg.progress || 0;
+
+          // Keep game ghostStates synchronized for live leaderboard ranking
+          if (this.game && this.game.ghostStates) {
+            const gs = this.game.ghostStates.find(item => item.id === msg.id);
+            if (gs) {
+              gs.x = msg.x;
+              gs.y = msg.y;
+              gs.rotationZ = msg.rot;
+              gs.isAlive = msg.isAlive;
+            }
+          }
+
           if (this.game.renderer) {
             this.game.renderer.updateGhost(msg.id, msg.x, msg.y, msg.rot, msg.isAlive);
           }
@@ -342,9 +375,15 @@ export class MultiplayerManager {
       }
     }
     else if (msg.type === 'crash') {
-      if (msg.id !== this.localPlayerId && this.game.renderer && this.game.renderer.triggerDeathExplosion) {
-        const color = this.players.get(msg.id)?.colorHex || '#FF0055';
-        this.game.renderer.triggerDeathExplosion(new THREE.Vector3(msg.x, msg.y, 0), color);
+      if (msg.id !== this.localPlayerId) {
+        if (this.game && this.game.ghostStates) {
+          const gs = this.game.ghostStates.find(item => item.id === msg.id);
+          if (gs) gs.isAlive = false;
+        }
+        if (this.game.renderer && this.game.renderer.triggerDeathExplosion) {
+          const color = this.players.get(msg.id)?.colorHex || '#FF0055';
+          this.game.renderer.triggerDeathExplosion(new THREE.Vector3(msg.x, msg.y, 0), color);
+        }
       }
     }
   }
