@@ -66,6 +66,139 @@ body, html {
   transition: opacity 0.2s ease-out;
 }
 
+/* ⚡ High-Power Inductor Coil Warp Transition Overlay */
+.coil-warp-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  width: 100dvw;
+  height: 100vh;
+  height: 100dvh;
+  z-index: 120;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+  background: radial-gradient(circle at center, rgba(0, 240, 255, 0.18) 0%, rgba(213, 0, 249, 0.22) 45%, rgba(1, 4, 14, 0.75) 85%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+.coil-warp-overlay.warp-active {
+  opacity: 1;
+}
+
+.warp-vortex-ring {
+  position: absolute;
+  border-radius: 50%;
+  pointer-events: none;
+}
+.ring-outer {
+  width: min(85vmin, 680px);
+  height: min(85vmin, 680px);
+  border: 4px dashed rgba(0, 240, 255, 0.75);
+  box-shadow: 0 0 50px rgba(0, 240, 255, 0.6), inset 0 0 50px rgba(0, 240, 255, 0.4);
+  animation: warpOuterSpin 1.4s linear infinite;
+}
+.ring-mid {
+  width: min(60vmin, 480px);
+  height: min(60vmin, 480px);
+  border: 3px solid rgba(213, 0, 249, 0.85);
+  box-shadow: 0 0 40px rgba(213, 0, 249, 0.7), inset 0 0 35px rgba(255, 215, 0, 0.4);
+  animation: warpMidSpin 0.95s linear infinite reverse;
+}
+.ring-inner {
+  width: min(35vmin, 280px);
+  height: min(35vmin, 280px);
+  border: 5px dotted #00ffff;
+  box-shadow: 0 0 60px #00ffff, inset 0 0 45px #00f0ff;
+  animation: warpInnerPulse 0.45s ease-in-out infinite alternate;
+}
+
+.warp-energy-stream {
+  position: absolute;
+  top: 50%;
+  left: -20%;
+  right: -20%;
+  height: 4px;
+  background: linear-gradient(90deg, transparent 0%, #00f0ff 25%, #ffffff 50%, #d500f9 75%, transparent 100%);
+  box-shadow: 0 0 30px #00ffff, 0 0 60px #d500f9;
+  transform: translateY(-50%);
+  animation: warpStreamFlash 0.3s ease-in-out infinite alternate;
+}
+
+.warp-hud-panel {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(3, 8, 20, 0.82);
+  border: 2px solid rgba(0, 240, 255, 0.65);
+  box-shadow: 0 0 35px rgba(0, 240, 255, 0.4), inset 0 0 25px rgba(213, 0, 249, 0.3);
+  border-radius: 16px;
+  padding: 16px 28px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  animation: warpHudFloat 0.8s ease-in-out infinite alternate;
+}
+.warp-hud-badge {
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  color: #00ff88;
+  text-shadow: 0 0 12px #00ff88;
+  margin-bottom: 4px;
+}
+.warp-hud-title {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(22px, 4.5vw, 36px);
+  letter-spacing: 4px;
+  color: #ffffff;
+  text-shadow: 0 0 20px #00f0ff, 0 0 35px #d500f9;
+  text-transform: uppercase;
+}
+.warp-hud-stats {
+  display: flex;
+  gap: 12px;
+  margin-top: 8px;
+}
+.warp-stat-pill {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 2px;
+  color: #00e5ff;
+  background: rgba(0, 229, 255, 0.14);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 20px;
+  padding: 3px 10px;
+}
+
+@keyframes warpOuterSpin {
+  0% { transform: rotate(0deg) scale(0.92); }
+  50% { transform: rotate(180deg) scale(1.08); }
+  100% { transform: rotate(360deg) scale(0.92); }
+}
+@keyframes warpMidSpin {
+  0% { transform: rotate(0deg) scale(1.05); }
+  50% { transform: rotate(180deg) scale(0.95); }
+  100% { transform: rotate(360deg) scale(1.05); }
+}
+@keyframes warpInnerPulse {
+  0% { transform: scale(0.85); filter: brightness(0.9); }
+  100% { transform: scale(1.18); filter: brightness(1.6); }
+}
+@keyframes warpStreamFlash {
+  0% { opacity: 0.5; height: 3px; }
+  100% { opacity: 1; height: 8px; }
+}
+@keyframes warpHudFloat {
+  0% { transform: translateY(0) scale(0.98); }
+  100% { transform: translateY(-4px) scale(1.02); }
+}
+
 /* Synced Race Countdown Overlay */
 .race-countdown-overlay {
   position: absolute;
@@ -1886,3 +2019,170 @@ body, html {
   0% { box-shadow: 0 4px 20px rgba(0, 255, 136, 0.4); }
   100% { box-shadow: 0 6px 35px rgba(0, 255, 136, 0.85); transform: translateY(-1px); }
 }
+
+/* 👾 Interactive Cyber Boss Battle HUD */
+.boss-hud {
+  position: absolute;
+  top: 56px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 90;
+  pointer-events: none;
+  display: flex;
+  justify-content: center;
+  width: min(90vw, 560px);
+  animation: bossHudEntry 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.boss-hud-inner {
+  width: 100%;
+  background: rgba(4, 10, 24, 0.88);
+  border: 2px solid rgba(255, 0, 85, 0.65);
+  box-shadow: 0 0 25px rgba(255, 0, 85, 0.35), inset 0 0 20px rgba(0, 240, 255, 0.15);
+  border-radius: 12px;
+  padding: 8px 16px 12px 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+
+.boss-header-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 6px;
+}
+
+.boss-skull-icon {
+  font-size: 22px;
+  animation: bossSkullBeat 0.8s ease-in-out infinite alternate;
+}
+
+.boss-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.boss-title {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 14px;
+  letter-spacing: 2px;
+  color: #ffffff;
+  text-shadow: 0 0 10px #ff0055, 0 0 18px #ff0055;
+}
+
+.boss-phase-badge {
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #00ff88;
+  text-transform: uppercase;
+}
+
+.boss-hp-num {
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: 16px;
+  letter-spacing: 1px;
+  color: #ff0055;
+  text-shadow: 0 0 12px #ff0055;
+}
+
+.boss-hp-bar-bg {
+  position: relative;
+  width: 100%;
+  height: 12px;
+  background: rgba(10, 16, 32, 0.9);
+  border: 1px solid rgba(255, 0, 85, 0.4);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.boss-hp-bar-ghost {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: rgba(255, 255, 255, 0.4);
+  transition: width 0.4s ease-out;
+}
+
+.boss-hp-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, #ff0055 0%, #ff5500 50%, #00f0ff 100%);
+  box-shadow: 0 0 12px #ff0055;
+  transition: width 0.12s linear;
+}
+
+.boss-hp-scanline {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: repeating-linear-gradient(90deg, transparent, transparent 6px, rgba(0, 0, 0, 0.5) 6px, rgba(0, 0, 0, 0.5) 8px);
+  pointer-events: none;
+}
+
+/* ⚠ Dynamic Boss Warning Banner */
+.boss-warning-banner {
+  position: absolute;
+  top: 110px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 95;
+  pointer-events: none;
+  font-family: 'Impact', 'Arial Black', sans-serif;
+  font-size: clamp(14px, 3.2vw, 22px);
+  letter-spacing: 3px;
+  color: #ff0055;
+  background: rgba(18, 2, 8, 0.85);
+  border: 2px solid #ff0055;
+  border-radius: 8px;
+  padding: 6px 18px;
+  text-shadow: 0 0 16px #ff0055;
+  box-shadow: 0 0 30px rgba(255, 0, 85, 0.6);
+  animation: warningFlash 0.35s ease-in-out infinite alternate;
+}
+
+/* 🛡️ Player Shield Indicator */
+.player-shield-indicator {
+  position: absolute;
+  top: 54px;
+  left: 18px;
+  z-index: 85;
+  pointer-events: none;
+  font-family: system-ui, -apple-system, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  color: #00ffff;
+  background: rgba(0, 240, 255, 0.15);
+  border: 1px solid rgba(0, 240, 255, 0.6);
+  box-shadow: 0 0 16px rgba(0, 240, 255, 0.4);
+  border-radius: 20px;
+  padding: 4px 12px;
+  animation: shieldIndicatorPulse 1.2s ease-in-out infinite alternate;
+}
+
+@keyframes bossHudEntry {
+  0% { opacity: 0; transform: translate(-50%, -20px) scale(0.95); }
+  100% { opacity: 1; transform: translate(-50%, 0) scale(1); }
+}
+@keyframes bossSkullBeat {
+  0% { transform: scale(0.9); }
+  100% { transform: scale(1.18); }
+}
+@keyframes warningFlash {
+  0% { opacity: 0.65; transform: translateX(-50%) scale(0.97); }
+  100% { opacity: 1; transform: translateX(-50%) scale(1.03); }
+}
+@keyframes shieldIndicatorPulse {
+  0% { opacity: 0.75; transform: scale(0.96); }
+  100% { opacity: 1; transform: scale(1.04); }
+}
+

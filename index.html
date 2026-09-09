@@ -15,6 +15,22 @@
   <!-- Cinematic Screen Flash Overlay on Crash -->
   <div id="screen-flash"></div>
 
+  <!-- ⚡ High-Power Inductor Coil Warp Transition Overlay -->
+  <div id="coil-warp-overlay" class="coil-warp-overlay" style="display:none;">
+    <div class="warp-vortex-ring ring-outer"></div>
+    <div class="warp-vortex-ring ring-mid"></div>
+    <div class="warp-vortex-ring ring-inner"></div>
+    <div class="warp-energy-stream"></div>
+    <div class="warp-hud-panel">
+      <div class="warp-hud-badge">⚡ LEVEL COMPLETED ⚡</div>
+      <div class="warp-hud-title">QUANTUM INDUCTOR WARP</div>
+      <div class="warp-hud-stats">
+        <span class="warp-stat-pill">FLUX: 100% MAXIMUM</span>
+        <span class="warp-stat-pill">SPACE-TIME: BENDING</span>
+      </div>
+    </div>
+  </div>
+
   <!-- Synced Race Countdown Overlay -->
   <div id="race-countdown-overlay" class="race-countdown-overlay" style="display:none;">
     <div id="countdown-number" class="countdown-text">3</div>
@@ -86,6 +102,35 @@
       <div id="gem-counter" class="micro-stat gem-stat" title="Gems Collected">💎 <span id="gem-count-text">0 / 0</span></div>
       <div id="attempt-count" class="micro-stat attempt-stat">ATTEMPT <span>1</span></div>
       <div id="best-record" class="micro-stat best-stat">BEST <span>0%</span></div>
+    </div>
+
+    <!-- 👾 Interactive Cyber Boss Battle HUD -->
+    <div id="boss-hud" class="boss-hud" style="display:none;">
+      <div class="boss-hud-inner">
+        <div class="boss-header-row">
+          <div class="boss-skull-icon">👾</div>
+          <div class="boss-info">
+            <div class="boss-title" id="boss-name">V.E.X.O.R. // QUANTUM CORE</div>
+            <div class="boss-phase-badge" id="boss-phase">PHASE 1: QUANTUM STABLE</div>
+          </div>
+          <div class="boss-hp-num" id="boss-hp-num">100%</div>
+        </div>
+        <div class="boss-hp-bar-bg">
+          <div id="boss-hp-ghost" class="boss-hp-bar-ghost"></div>
+          <div id="boss-hp-fill" class="boss-hp-bar-fill"></div>
+          <div class="boss-hp-scanline"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ⚠ Dynamic Boss Warning / Threat Hologram Banner -->
+    <div id="boss-warning-banner" class="boss-warning-banner" style="display:none;">
+      ⚠ WARNING: THREAT DETECTED ⚠
+    </div>
+
+    <!-- 🛡️ Active Player Energy Shield Buff Indicator -->
+    <div id="player-shield-indicator" class="player-shield-indicator" style="display:none;">
+      🛡️ SHIELD ACTIVE
     </div>
 
     <!-- Top Center Animated Tung Tung Sahur Alert Banner -->

@@ -22,6 +22,26 @@ if (typeof CanvasRenderingContext2D !== 'undefined' && !CanvasRenderingContext2D
   };
 }
 
+// ⚡ Helical 3D Curve for Inductor Coil Superconducting Windings
+class InductorHelixCurve extends THREE.Curve {
+  constructor(startX, length, radius, turns, centerY, phase = 0) {
+    super();
+    this.startX = startX;
+    this.length = length;
+    this.radius = radius;
+    this.turns = turns;
+    this.centerY = centerY;
+    this.phase = phase;
+  }
+  getPoint(t, optionalTarget = new THREE.Vector3()) {
+    const x = this.startX + t * this.length;
+    const angle = t * this.turns * Math.PI * 2 + this.phase;
+    const y = this.centerY + Math.sin(angle) * this.radius;
+    const z = Math.cos(angle) * this.radius;
+    return optionalTarget.set(x, y, z);
+  }
+}
+
 export class GameRenderer {
   constructor(containerId) {
     this.container = document.getElementById(containerId);
@@ -44,6 +64,18 @@ export class GameRenderer {
     this.checkpointMeshes = [];
     this.spikeMeshes = [];
     this.shockwaves = []; // Dynamic expanding rings for pads/orbs/turns
+
+    // ⚡ Massive 3D Sci-Fi Inductor Coil Transition Rig
+    this.inductorCoilGroup = null;
+    this.inductorRotorRings = [];
+    this.inductorPulseRings = [];
+    this.inductorArcs = [];
+    this.inductorCoreLight = null;
+    this.isCoilTransition = false;
+    this.coilProgress = 0;
+    this.defaultCameraFov = 54;
+    this.plasmaStreamParticles = [];
+    this.plasmaPoints = null;
 
     // Procedural Scenery Manager (Parallax Metropolis, Alien Ruins, Inferno, Quantum Nebula)
     this.sceneryManager = null;
@@ -210,6 +242,22 @@ export class GameRenderer {
     this.gemMeshes = [];
     this.currentLevel = level;
 
+    // Clean up previous Inductor Coil elements
+    if (this.inductorCoreLight) {
+      this.scene.remove(this.inductorCoreLight);
+      this.inductorCoreLight = null;
+    }
+    this.inductorCoilGroup = null;
+    this.inductorRotorRings = [];
+    this.inductorPulseRings = [];
+    this.inductorArcs = [];
+    this.isCoilTransition = false;
+    this.coilProgress = 0;
+    if (this.camera) {
+      this.camera.fov = this.defaultCameraFov;
+      this.camera.updateProjectionMatrix();
+    }
+
     // Set Level Theme Color
     this.themeColor.set(level.diffColor || "#00FF88");
     if (this.underglow) this.underglow.color.copy(this.themeColor);
@@ -283,8 +331,8 @@ export class GameRenderer {
       this.createObstacleMesh(obs, index);
     });
 
-    // 3. Victory Finish Gate
-    this.createVictoryGate(level.endX);
+    // 3. ⚡ High-Power 3D Inductor Coil Transition Gate at Level Finish
+    this.createInductorCoil(level.endX);
   }
 
   createObstacleMesh(obs, index) {
@@ -506,6 +554,7 @@ export class GameRenderer {
       else if (obs.subType === "cube") portalColor = 0xffd000;
       else if (obs.subType === "gravity_up") portalColor = 0x00b0ff;
       else if (obs.subType === "gravity_down") portalColor = 0xff7700;
+      else if (obs.subType === "ufo") portalColor = 0xffa500;
 
       // Arched Outer Frame
       const ringGeo = new THREE.TorusGeometry(1.7, 0.22, 16, 40);
@@ -587,6 +636,148 @@ export class GameRenderer {
       this.gemMeshes.push(gemGroup);
       this.obstaclesGroup.add(gemGroup);
     }
+    else if (type === "speed_gate") {
+      // ⚡ High-Speed Quantum Acceleration Gate
+      const gateGroup = new THREE.Group();
+      const mult = obs.speedMult || 2.0;
+      let gateColor = 0x00ff88;
+      if (mult <= 0.75) gateColor = 0xff8800;
+      else if (mult === 1.0) gateColor = 0xffd700;
+      else if (mult === 2.0) gateColor = 0x00ff88;
+      else if (mult === 3.0) gateColor = 0xd500f9;
+      else if (mult >= 4.0) gateColor = 0x00ffff;
+
+      // Twin Slanted Arch Pylons
+      const pylonGeo = new THREE.BoxGeometry(0.35, 5.0, 0.45);
+      const pylonMat = new THREE.MeshStandardMaterial({
+        color: 0x0c1424,
+        roughness: 0.2,
+        metalness: 0.9
+      });
+      const pylonL = new THREE.Mesh(pylonGeo, pylonMat);
+      pylonL.position.set(-0.2, 2.5, -2.0);
+      const pylonR = new THREE.Mesh(pylonGeo, pylonMat);
+      pylonR.position.set(-0.2, 2.5, 2.0);
+      gateGroup.add(pylonL);
+      gateGroup.add(pylonR);
+
+      // Glowing Neon Pylon Wireframes
+      const pylonWireMat = new THREE.LineBasicMaterial({ color: gateColor, linewidth: 2 });
+      pylonL.add(new THREE.LineSegments(new THREE.EdgesGeometry(pylonGeo), pylonWireMat));
+      pylonR.add(new THREE.LineSegments(new THREE.EdgesGeometry(pylonGeo), pylonWireMat));
+
+      // 3 Floating Directional Speed Chevrons '>>>'
+      const chevronsGroup = new THREE.Group();
+      for (let c = 0; c < 3; c++) {
+        const chevGeo = new THREE.ConeGeometry(0.55, 0.7, 3);
+        const chevMat = new THREE.MeshBasicMaterial({
+          color: gateColor,
+          transparent: true,
+          opacity: 0.85
+        });
+        const chev = new THREE.Mesh(chevGeo, chevMat);
+        chev.rotation.z = -Math.PI / 2;
+        chev.position.set((c - 1) * 0.9, 2.5, 0);
+        chevronsGroup.add(chev);
+      }
+      gateGroup.add(chevronsGroup);
+
+      // Top Sign Header
+      const signGeo = new THREE.BoxGeometry(1.6, 0.45, 0.15);
+      const signMat = new THREE.MeshBasicMaterial({ color: gateColor });
+      const sign = new THREE.Mesh(signGeo, signMat);
+      sign.position.set(0, 5.1, 0);
+      gateGroup.add(sign);
+
+      gateGroup.position.set(x, y, 0);
+      gateGroup.userData = {
+        obstacle: obs,
+        chevrons: chevronsGroup,
+        color: gateColor,
+        mult: mult
+      };
+      this.obstaclesGroup.add(gateGroup);
+      if (!this.speedGateMeshes) this.speedGateMeshes = [];
+      this.speedGateMeshes.push(gateGroup);
+    }
+    else if (type === "shield") {
+      // 🛡️ Collectible 3D Energy Shield Orb
+      const shieldGroup = new THREE.Group();
+      const coreGeo = new THREE.OctahedronGeometry(0.42, 0);
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: 0x00f0ff,
+        emissive: 0x00b0ff,
+        emissiveIntensity: 0.8,
+        metalness: 0.9,
+        roughness: 0.1
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      shieldGroup.add(core);
+
+      // Outer Pulsing Hexagonal Wire Cage
+      const cageGeo = new THREE.IcosahedronGeometry(0.72, 1);
+      const cageMat = new THREE.MeshBasicMaterial({
+        color: 0x00ffff,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.65
+      });
+      const cage = new THREE.Mesh(cageGeo, cageMat);
+      shieldGroup.add(cage);
+
+      shieldGroup.position.set(x, y, 0);
+      shieldGroup.userData = {
+        obstacle: obs,
+        core: core,
+        cage: cage,
+        isCollected: false
+      };
+      this.obstaclesGroup.add(shieldGroup);
+      if (!this.shieldPickupMeshes) this.shieldPickupMeshes = [];
+      this.shieldPickupMeshes.push(shieldGroup);
+    }
+    else if (type === "counter_orb") {
+      // 🚀 Rhythm Counter-Attack Turret Orb
+      const turretGroup = new THREE.Group();
+      const ring1Geo = new THREE.TorusGeometry(0.85, 0.08, 12, 32);
+      const ringMat = new THREE.MeshStandardMaterial({
+        color: 0xffd700,
+        emissive: 0xffa500,
+        emissiveIntensity: 0.9,
+        metalness: 0.9,
+        roughness: 0.1
+      });
+      const ring1 = new THREE.Mesh(ring1Geo, ringMat);
+      turretGroup.add(ring1);
+
+      const ring2Geo = new THREE.TorusGeometry(0.65, 0.06, 12, 28);
+      const ring2Mat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+      const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+      ring2.rotation.x = Math.PI / 2;
+      turretGroup.add(ring2);
+
+      // Inner Glowing Target Crosshair
+      const crossGeo = new THREE.OctahedronGeometry(0.25, 0);
+      const crossMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const cross = new THREE.Mesh(crossGeo, crossMat);
+      turretGroup.add(cross);
+
+      turretGroup.position.set(x, y, 0);
+      turretGroup.userData = {
+        obstacle: obs,
+        ring1: ring1,
+        ring2: ring2,
+        cross: cross,
+        pulseVal: 0,
+        triggerTurret: () => {
+          turretGroup.userData.pulseVal = 1.2;
+          this.triggerShockwave(x, y, 0xffd700, 3.5);
+        }
+      };
+      this.obstaclesGroup.add(turretGroup);
+      if (!this.counterOrbMeshes) this.counterOrbMeshes = [];
+      this.counterOrbMeshes.push(turretGroup);
+    }
   }
 
   // Trigger Sparkling Gem Pickup Burst
@@ -630,41 +821,425 @@ export class GameRenderer {
     });
   }
 
-  createVictoryGate(endX) {
-    const gateGroup = new THREE.Group();
-    const pillarGeo = new THREE.BoxGeometry(1.6, 16, 2.5);
-    const pillarMat = new THREE.MeshStandardMaterial({
-      color: 0x090d18,
-      metalness: 0.9,
-      roughness: 0.2
+  // ═════════════════════════════════════════════════════════════════
+  // ⚡ MASSIVE 3D SCI-FI INDUCTOR COIL TRANSITION ACCELERATOR
+  // ═════════════════════════════════════════════════════════════════
+  createInductorCoil(endX) {
+    const coilGroup = new THREE.Group();
+    const centerY = 2.8;
+    const coilLength = 26.0;
+    const turns = 14;
+    const radius = 2.35;
+
+    this.inductorRotorRings = [];
+    this.inductorPulseRings = [];
+    this.inductorArcs = [];
+
+    // 1. Primary Helical Superconducting Copper Wire Winding
+    const copperCurve = new InductorHelixCurve(endX, coilLength, radius, turns, centerY, 0);
+    const copperGeo = new THREE.TubeGeometry(copperCurve, 260, 0.28, 12, false);
+    const copperMat = new THREE.MeshStandardMaterial({
+      color: 0xeb6a33,
+      roughness: 0.18,
+      metalness: 0.95,
+      emissive: 0x5a1805,
+      emissiveIntensity: 0.4
+    });
+    const copperMesh = new THREE.Mesh(copperGeo, copperMat);
+    coilGroup.add(copperMesh);
+
+    // 2. Interleaved Glowing Electric Cyan Plasma Secondary Wire
+    const plasmaCurve = new InductorHelixCurve(endX, coilLength, radius, turns, centerY, Math.PI);
+    const plasmaGeo = new THREE.TubeGeometry(plasmaCurve, 220, 0.09, 8, false);
+    const plasmaMat = new THREE.MeshBasicMaterial({
+      color: 0x00f0ff,
+      transparent: true,
+      opacity: 0.92
+    });
+    const plasmaMesh = new THREE.Mesh(plasmaGeo, plasmaMat);
+    coilGroup.add(plasmaMesh);
+
+    // 3. Heavy Industrial Magnetic Stator Choke Collars & Rotors
+    const ringCount = 6;
+    const darkAlloyMat = new THREE.MeshStandardMaterial({
+      color: 0x0a101b,
+      metalness: 0.92,
+      roughness: 0.22
+    });
+    const neonTrimMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffcc
+    });
+    const hazardYellowMat = new THREE.MeshStandardMaterial({
+      color: 0xffaa00,
+      metalness: 0.6,
+      roughness: 0.3
     });
 
-    const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
-    leftPillar.position.set(endX, 8, -3);
-    const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
-    rightPillar.position.set(endX, 8, 3);
+    for (let i = 0; i < ringCount; i++) {
+      const ringX = endX + (i / (ringCount - 1)) * coilLength;
+      const collarGroup = new THREE.Group();
+      collarGroup.position.set(ringX, centerY, 0);
 
-    const wireMat = new THREE.LineBasicMaterial({ color: 0xffd700, linewidth: 2 });
-    leftPillar.add(new THREE.LineSegments(new THREE.EdgesGeometry(pillarGeo), wireMat));
-    rightPillar.add(new THREE.LineSegments(new THREE.EdgesGeometry(pillarGeo), wireMat));
+      // Main Outer Torus Housing
+      const torusGeo = new THREE.TorusGeometry(2.75, 0.34, 12, 32);
+      const torusMesh = new THREE.Mesh(torusGeo, darkAlloyMat);
+      torusMesh.rotation.y = Math.PI / 2;
+      collarGroup.add(torusMesh);
 
-    const archGeo = new THREE.BoxGeometry(1.8, 2.2, 8);
-    const arch = new THREE.Mesh(archGeo, pillarMat);
-    arch.position.set(endX, 16, 0);
-    arch.add(new THREE.LineSegments(new THREE.EdgesGeometry(archGeo), wireMat));
+      // Glowing Neon Status Trim Ring
+      const trimGeo = new THREE.TorusGeometry(2.82, 0.08, 8, 32);
+      const trimMesh = new THREE.Mesh(trimGeo, neonTrimMat);
+      trimMesh.rotation.y = Math.PI / 2;
+      collarGroup.add(trimMesh);
 
-    // Glowing Golden Light Wall
-    const banner = new THREE.Mesh(
-      new THREE.PlaneGeometry(0.1, 14),
-      new THREE.MeshBasicMaterial({ color: 0xffd700, transparent: true, opacity: 0.6, side: THREE.DoubleSide })
-    );
-    banner.position.set(endX, 8, 0);
+      // Counter-Rotating Stator Core Rotor Ring with 8 Magnetic Teeth
+      const rotorGroup = new THREE.Group();
+      const rotorBaseGeo = new THREE.TorusGeometry(2.45, 0.12, 8, 24);
+      const rotorBase = new THREE.Mesh(rotorBaseGeo, darkAlloyMat);
+      rotorBase.rotation.y = Math.PI / 2;
+      rotorGroup.add(rotorBase);
 
-    gateGroup.add(leftPillar);
-    gateGroup.add(rightPillar);
-    gateGroup.add(arch);
-    gateGroup.add(banner);
-    this.obstaclesGroup.add(gateGroup);
+      const toothGeo = new THREE.BoxGeometry(0.3, 0.45, 0.18);
+      for (let t = 0; t < 8; t++) {
+        const toothMat = (t % 2 === 0) ? neonTrimMat : darkAlloyMat;
+        const tooth = new THREE.Mesh(toothGeo, toothMat);
+        const toothAngle = (t / 8) * Math.PI * 2;
+        tooth.position.set(0, Math.sin(toothAngle) * 2.45, Math.cos(toothAngle) * 2.45);
+        tooth.rotation.x = -toothAngle;
+        rotorGroup.add(tooth);
+      }
+      collarGroup.add(rotorGroup);
+      this.inductorRotorRings.push({
+        mesh: rotorGroup,
+        speed: (i % 2 === 0 ? 1 : -1) * (1.8 + i * 0.2)
+      });
+
+      // Heavy Ground Support Pylons (Connecting collar to track ground at y = 0)
+      const pylonGeo = new THREE.BoxGeometry(0.65, centerY, 0.5);
+      const leftPylon = new THREE.Mesh(pylonGeo, darkAlloyMat);
+      leftPylon.position.set(0, -centerY / 2, -2.5);
+      const rightPylon = new THREE.Mesh(pylonGeo, darkAlloyMat);
+      rightPylon.position.set(0, -centerY / 2, 2.5);
+
+      // Hazard Stripes on Pylons
+      const stripeGeo = new THREE.BoxGeometry(0.67, 0.5, 0.52);
+      const leftStripe = new THREE.Mesh(stripeGeo, hazardYellowMat);
+      leftStripe.position.set(0, -centerY * 0.4, -2.5);
+      const rightStripe = new THREE.Mesh(stripeGeo, hazardYellowMat);
+      rightStripe.position.set(0, -centerY * 0.4, 2.5);
+
+      // Heavy Floor Base Footplates
+      const footGeo = new THREE.BoxGeometry(1.4, 0.22, 1.0);
+      const leftFoot = new THREE.Mesh(footGeo, darkAlloyMat);
+      leftFoot.position.set(0, -centerY + 0.11, -2.5);
+      const rightFoot = new THREE.Mesh(footGeo, darkAlloyMat);
+      rightFoot.position.set(0, -centerY + 0.11, 2.5);
+
+      collarGroup.add(leftPylon);
+      collarGroup.add(rightPylon);
+      collarGroup.add(leftStripe);
+      collarGroup.add(rightStripe);
+      collarGroup.add(leftFoot);
+      collarGroup.add(rightFoot);
+
+      coilGroup.add(collarGroup);
+    }
+
+    // 4. Entrance & Exit Flared Magnetic Aperture Funnels
+    // Entrance Funnel at endX
+    const inFunnelGeo = new THREE.CylinderGeometry(3.3, 2.5, 1.4, 24, 1, true);
+    const inFunnelMesh = new THREE.Mesh(inFunnelGeo, darkAlloyMat);
+    inFunnelMesh.rotation.z = Math.PI / 2;
+    inFunnelMesh.position.set(endX - 0.7, centerY, 0);
+    coilGroup.add(inFunnelMesh);
+
+    const inRimGeo = new THREE.TorusGeometry(3.3, 0.18, 8, 36);
+    const inRim = new THREE.Mesh(inRimGeo, neonTrimMat);
+    inRim.rotation.y = Math.PI / 2;
+    inRim.position.set(endX - 1.4, centerY, 0);
+    coilGroup.add(inRim);
+
+    // Exit Funnel at endX + coilLength
+    const outFunnelGeo = new THREE.CylinderGeometry(2.5, 3.4, 1.5, 24, 1, true);
+    const outFunnelMesh = new THREE.Mesh(outFunnelGeo, darkAlloyMat);
+    outFunnelMesh.rotation.z = Math.PI / 2;
+    outFunnelMesh.position.set(endX + coilLength + 0.75, centerY, 0);
+    coilGroup.add(outFunnelMesh);
+
+    const outRimGeo = new THREE.TorusGeometry(3.4, 0.2, 8, 36);
+    const outRimMat = new THREE.MeshBasicMaterial({ color: 0xd500f9 });
+    const outRim = new THREE.Mesh(outRimGeo, outRimMat);
+    outRim.rotation.y = Math.PI / 2;
+    outRim.position.set(endX + coilLength + 1.5, centerY, 0);
+    coilGroup.add(outRim);
+
+    // 5. Holographic HUD Billboard Sign Hovering Above Entrance
+    this.createInductorHudSign(endX + 1.2, centerY + 4.2, coilGroup);
+
+    // 6. Transparent Internal Induction Core Tunnel & Pulse Rings
+    const tunnelGeo = new THREE.CylinderGeometry(1.85, 1.85, coilLength, 24, 1, true);
+    const tunnelMat = new THREE.MeshBasicMaterial({
+      color: 0x00d9ff,
+      wireframe: true,
+      transparent: true,
+      opacity: 0.18
+    });
+    const tunnelMesh = new THREE.Mesh(tunnelGeo, tunnelMat);
+    tunnelMesh.rotation.z = Math.PI / 2;
+    tunnelMesh.position.set(endX + coilLength / 2, centerY, 0);
+    coilGroup.add(tunnelMesh);
+
+    // 5 Traveling Electromagnetic Induction Pulse Rings
+    for (let p = 0; p < 5; p++) {
+      const pRingGeo = new THREE.TorusGeometry(1.78, 0.08, 8, 28);
+      const pRingMat = new THREE.MeshBasicMaterial({
+        color: (p % 2 === 0) ? 0x00ffff : 0xd500f9,
+        transparent: true,
+        opacity: 0.75
+      });
+      const pRing = new THREE.Mesh(pRingGeo, pRingMat);
+      pRing.rotation.y = Math.PI / 2;
+      coilGroup.add(pRing);
+      this.inductorPulseRings.push({
+        mesh: pRing,
+        offset: p / 5,
+        startX: endX,
+        length: coilLength,
+        centerY
+      });
+    }
+
+    // 7. Dynamic Procedural Electric Arcs (Tesla High-Voltage Lightning Sparks)
+    const arcCount = 8;
+    for (let a = 0; a < arcCount; a++) {
+      const arcGeo = new THREE.BufferGeometry();
+      const posArray = new Float32Array(18); // 6 vertices => 5 line segments
+      arcGeo.setAttribute('position', new THREE.BufferAttribute(posArray, 3));
+      const arcMat = new THREE.LineBasicMaterial({
+        color: (a % 2 === 0) ? 0x88ffff : 0xffffff,
+        linewidth: 2,
+        transparent: true,
+        opacity: 0.95
+      });
+      const arcLine = new THREE.Line(arcGeo, arcMat);
+      coilGroup.add(arcLine);
+      this.inductorArcs.push({
+        line: arcLine,
+        geo: arcGeo,
+        arcIndex: a,
+        endX,
+        coilLength,
+        radius,
+        centerY,
+        timer: Math.random() * 0.1
+      });
+    }
+
+    // 8. Dynamic Central Induction PointLight
+    this.inductorCoreLight = new THREE.PointLight(0x00f0ff, 4.2, 40);
+    this.inductorCoreLight.position.set(endX + coilLength / 2, centerY, 0);
+    this.scene.add(this.inductorCoreLight);
+
+    this.inductorCoilGroup = coilGroup;
+    this.obstaclesGroup.add(coilGroup);
+  }
+
+  createInductorHudSign(x, y, parentGroup) {
+    const canvas = document.createElement('canvas');
+    canvas.width = 512;
+    canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // Glowing cyber frame
+    ctx.fillStyle = "rgba(4, 12, 28, 0.88)";
+    ctx.strokeStyle = "#00f0ff";
+    ctx.lineWidth = 6;
+    ctx.strokeRect(10, 10, 492, 108);
+    ctx.fillRect(10, 10, 492, 108);
+
+    // Cyan top header
+    ctx.fillStyle = "#00ff88";
+    ctx.font = "bold 20px sans-serif";
+    ctx.textAlign = "center";
+    ctx.fillText("⚡ QUANTUM INDUCTOR // LEVEL TRANSITION ⚡", 256, 42);
+
+    // Subtitle
+    ctx.fillStyle = "#00f0ff";
+    ctx.font = "bold 32px -apple-system, Impact, sans-serif";
+    ctx.fillText("ENTER WARP FIELD", 256, 88);
+
+    const texture = new THREE.CanvasTexture(canvas);
+    const planeGeo = new THREE.PlaneGeometry(6.4, 1.6);
+    const planeMat = new THREE.MeshBasicMaterial({
+      map: texture,
+      transparent: true,
+      side: THREE.DoubleSide
+    });
+    const signMesh = new THREE.Mesh(planeGeo, planeMat);
+    signMesh.position.set(x, y, 0);
+    parentGroup.add(signMesh);
+  }
+
+  updateInductorCoil(dt, time) {
+    if (!this.inductorCoilGroup) return;
+
+    // 1. Rotate Electromagnetic Rotor Teeth
+    this.inductorRotorRings.forEach(rotor => {
+      rotor.mesh.rotation.x += dt * rotor.speed;
+    });
+
+    // 2. Translate Induction Pulse Rings along Tunnel Axis
+    this.inductorPulseRings.forEach(pRing => {
+      pRing.offset = (pRing.offset + dt * 0.45) % 1.0;
+      const x = pRing.startX + pRing.offset * pRing.length;
+      pRing.mesh.position.set(x, pRing.centerY, 0);
+      const scale = 0.85 + Math.sin(pRing.offset * Math.PI) * 0.3;
+      pRing.mesh.scale.set(scale, scale, scale);
+    });
+
+    // 3. Regenerate Dynamic Tesla Lightning Arcs with Fractal Jitter
+    this.inductorArcs.forEach(arc => {
+      arc.timer -= dt;
+      if (arc.timer <= 0) {
+        arc.timer = 0.04 + Math.random() * 0.05; // 15-25 Hz electric discharge
+        const posAttr = arc.geo.attributes.position;
+        const arr = posAttr.array;
+
+        // Random pick along coil
+        const t = Math.random();
+        const startX = arc.endX + t * arc.coilLength;
+        const angle = t * 14 * Math.PI * 2;
+        const coilY = arc.centerY + Math.sin(angle) * arc.radius;
+        const coilZ = Math.cos(angle) * arc.radius;
+
+        // Arc shoots from coil turn towards center bore or adjacent turn
+        const targetX = startX + (Math.random() - 0.5) * 2.5;
+        const targetY = arc.centerY + (Math.random() - 0.5) * 1.0;
+        const targetZ = (Math.random() - 0.5) * 1.0;
+
+        const segments = 6;
+        for (let s = 0; s < segments; s++) {
+          const frac = s / (segments - 1);
+          // Midpoint fractal displacement
+          const jitter = (s === 0 || s === segments - 1) ? 0 : (Math.random() - 0.5) * 0.55;
+          arr[s * 3]     = startX + (targetX - startX) * frac + jitter;
+          arr[s * 3 + 1] = coilY + (targetY - coilY) * frac + jitter;
+          arr[s * 3 + 2] = coilZ + (targetZ - coilZ) * frac + jitter;
+        }
+        posAttr.needsUpdate = true;
+        arc.line.visible = Math.random() > 0.15;
+      }
+    });
+
+    // 4. Pulse Central Light
+    if (this.inductorCoreLight) {
+      this.inductorCoreLight.intensity = 3.5 + Math.sin(time * 18) * 1.8;
+      if (Math.random() > 0.85) {
+        this.inductorCoreLight.intensity += 1.5; // Random lightning arc flash
+      }
+    }
+  }
+
+  createVictoryGate(endX) {
+    this.createInductorCoil(endX);
+  }
+
+  // ⚡ Start Relativistic Inductor Coil Warp Transition
+  startCoilTransition(player, duration = 2.4, onComplete = null) {
+    this.isCoilTransition = true;
+    this.coilDuration = duration;
+    this.coilProgress = 0;
+    this.coilStartX = player ? player.x : (this.currentLevel ? this.currentLevel.endX : 400);
+    this.coilEndX = (this.currentLevel ? this.currentLevel.endX : 400) + 26.0;
+    this.coilOnComplete = onComplete;
+
+    // Show High-Power Inductor Warp HTML Overlay
+    const overlay = document.getElementById('coil-warp-overlay');
+    if (overlay) {
+      overlay.style.display = 'flex';
+      requestAnimationFrame(() => {
+        overlay.classList.add('warp-active');
+      });
+    }
+
+    // Trigger Initial Dual Shockwaves at Inductor Entrance
+    this.triggerShockwave(this.coilStartX, 2.8, 0x00f0ff, 4.8);
+    this.triggerShockwave(this.coilStartX, 2.8, 0xd500f9, 6.2);
+    this.cameraTrauma = Math.max(this.cameraTrauma, 0.5);
+  }
+
+  // ⚡ Update Inductor Warp Camera Dynamics & Relativistic Tunnel Transit
+  updateCoilTransition(dt, time, playerState) {
+    if (!this.isCoilTransition) return;
+
+    this.coilProgress += dt / this.coilDuration;
+    const p = Math.min(1.0, this.coilProgress);
+
+    // Dynamic S-Curve Warp Acceleration Profile
+    const easeP = p * p * (3 - 2 * p);
+    const warpX = this.coilStartX + easeP * (this.coilEndX - this.coilStartX + 8.0);
+
+    // Guide player through the superconducting bore
+    if (playerState) {
+      playerState.x = warpX;
+      playerState.y += (2.8 - playerState.y) * Math.min(1, 14 * dt);
+      playerState.rotationZ += dt * (14.0 + p * 32.0);
+    }
+
+    // Relativistic FOV Expansion: 54 -> 110 at peak mid-tunnel
+    const peakFov = 110;
+    const fovCurve = Math.sin(p * Math.PI);
+    this.camera.fov = this.defaultCameraFov + fovCurve * (peakFov - this.defaultCameraFov);
+    this.camera.updateProjectionMatrix();
+
+    // Camera locks directly down the superconducting tunnel axis
+    const camJitterX = Math.sin(time * 45) * 0.08 * fovCurve;
+    const camJitterY = Math.cos(time * 50) * 0.06 * fovCurve;
+    this.camera.position.set(warpX - 4.2 + camJitterX, 2.8 + camJitterY, 0.4);
+    this.camera.lookAt(warpX + 16.0, 2.8, 0);
+
+    // Dynamic camera barrel roll from relativistic magnetic frame dragging
+    this.camera.rotation.z = Math.sin(p * Math.PI * 2) * 0.25 * fovCurve;
+
+    // Overdrive magnetic stator rotor rings up to 10x speed
+    this.inductorRotorRings.forEach(rotor => {
+      rotor.mesh.rotation.x += dt * rotor.speed * (3.0 + p * 18.0);
+    });
+
+    // Intense central core light bloom
+    if (this.inductorCoreLight) {
+      this.inductorCoreLight.intensity = 5.0 + fovCurve * 18.0;
+      this.inductorCoreLight.color.setHex(p > 0.85 ? 0xffffff : 0x00f0ff);
+    }
+
+    // Inductor Breach Point reached!
+    if (this.coilProgress >= 1.0) {
+      this.isCoilTransition = false;
+      this.camera.fov = this.defaultCameraFov;
+      this.camera.rotation.z = 0;
+      this.camera.updateProjectionMatrix();
+
+      // Trigger blinding white screen flash & sonic shockwave
+      this.triggerScreenFlash(1.0);
+      this.triggerShockwave(this.coilEndX, 2.8, 0xffffff, 8.5);
+
+      // Dismiss overlay with smooth fade
+      const overlay = document.getElementById('coil-warp-overlay');
+      if (overlay) {
+        overlay.classList.remove('warp-active');
+        setTimeout(() => {
+          overlay.style.display = 'none';
+        }, 300);
+      }
+
+      // Execute onComplete callback
+      if (typeof this.coilOnComplete === 'function') {
+        const cb = this.coilOnComplete;
+        this.coilOnComplete = null;
+        cb();
+      }
+    }
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -930,7 +1505,117 @@ export class GameRenderer {
     this.waveMesh.visible = false;
     this.playerGroup.add(this.waveMesh);
 
-    // ── 4. DYNAMIC TRAIL RIBBON ──
+    // ── 4. HIGH-TECH ALIEN UFO RIG WITH ANTI-GRAV SAUCER & COCKPIT ──
+    const ufoGroup = new THREE.Group();
+
+    // Saucer Outer Hull: Heavy brushed titanium disc with sloping rim
+    const hullGeo = new THREE.CylinderGeometry(0.88, 1.05, 0.22, 24);
+    const hullMat = new THREE.MeshStandardMaterial({
+      color: 0x111c2e,
+      roughness: 0.18,
+      metalness: 0.92,
+      emissive: 0x051020,
+      emissiveIntensity: 0.4
+    });
+    const ufoHull = new THREE.Mesh(hullGeo, hullMat);
+    ufoGroup.add(ufoHull);
+
+    // Glowing Golden Amber Rim Trim
+    const rimTrimGeo = new THREE.TorusGeometry(0.98, 0.05, 8, 32);
+    const rimTrimMat = new THREE.MeshBasicMaterial({ color: 0xffaa00 });
+    const rimTrim = new THREE.Mesh(rimTrimGeo, rimTrimMat);
+    rimTrim.rotation.x = Math.PI / 2;
+    ufoHull.add(rimTrim);
+
+    // Glowing Hex Wireframe
+    const hullWire = new THREE.LineSegments(
+      new THREE.EdgesGeometry(hullGeo),
+      new THREE.LineBasicMaterial({ color: 0xffcc00, linewidth: 2 })
+    );
+    ufoHull.add(hullWire);
+
+    // Cockpit Canopy Dome: Glass Bubble with glowing pilot core
+    const domeGeo = new THREE.SphereGeometry(0.46, 20, 14, 0, Math.PI * 2, 0, Math.PI * 0.52);
+    const domeMat = new THREE.MeshStandardMaterial({
+      color: 0x00ffff,
+      roughness: 0.1,
+      metalness: 0.8,
+      transparent: true,
+      opacity: 0.82
+    });
+    const ufoDome = new THREE.Mesh(domeGeo, domeMat);
+    ufoDome.position.y = 0.11;
+    ufoGroup.add(ufoDome);
+
+    // Inner Glowing Pilot Sphere
+    const pilotGeo = new THREE.SphereGeometry(0.18, 12, 12);
+    const pilotMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const pilotCore = new THREE.Mesh(pilotGeo, pilotMat);
+    pilotCore.position.y = 0.22;
+    ufoGroup.add(pilotCore);
+
+    // Rotating Underbelly Anti-Gravity Reactor Rotor
+    const ufoRotorGroup = new THREE.Group();
+    const ufoRotorGeo = new THREE.TorusGeometry(0.68, 0.07, 8, 24);
+    const ufoRotorMat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    const ufoRotor = new THREE.Mesh(ufoRotorGeo, ufoRotorMat);
+    ufoRotor.rotation.x = Math.PI / 2;
+    ufoRotorGroup.add(ufoRotor);
+
+    // 4 Glowing Propulsion Nodes on Rotor
+    for (let r = 0; r < 4; r++) {
+      const nodeGeo = new THREE.SphereGeometry(0.08, 8, 8);
+      const nodeMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+      const node = new THREE.Mesh(nodeGeo, nodeMat);
+      const angle = (r / 4) * Math.PI * 2;
+      node.position.set(Math.cos(angle) * 0.68, 0, Math.sin(angle) * 0.68);
+      ufoRotorGroup.add(node);
+    }
+    ufoRotorGroup.position.y = -0.12;
+    ufoGroup.add(ufoRotorGroup);
+    this.ufoRotor = ufoRotorGroup;
+
+    // Pulsing Anti-Gravity Tractor Propulsion Beam
+    const beamGeo = new THREE.ConeGeometry(0.55, 0.9, 16, 1, true);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.45,
+      side: THREE.DoubleSide
+    });
+    const ufoBeam = new THREE.Mesh(beamGeo, beamMat);
+    ufoBeam.position.y = -0.58;
+    ufoGroup.add(ufoBeam);
+    this.ufoBeam = ufoBeam;
+
+    this.ufoMesh = ufoGroup;
+    this.ufoMesh.visible = false;
+    this.playerGroup.add(this.ufoMesh);
+
+    // ── 5. HEXAGONAL ENERGY SHIELD BARRIER (COLLECTIBLE BUFF) ──
+    const shieldGroup = new THREE.Group();
+    const shieldGeo = new THREE.IcosahedronGeometry(1.08, 1);
+    const shieldMat = new THREE.MeshStandardMaterial({
+      color: 0x00f0ff,
+      roughness: 0.2,
+      metalness: 0.9,
+      transparent: true,
+      opacity: 0.35,
+      side: THREE.DoubleSide
+    });
+    const shieldSphere = new THREE.Mesh(shieldGeo, shieldMat);
+    shieldGroup.add(shieldSphere);
+
+    const shieldWireGeo = new THREE.WireframeGeometry(shieldGeo);
+    const shieldWireMat = new THREE.LineBasicMaterial({ color: 0x88ffff, linewidth: 2.5 });
+    const shieldWire = new THREE.LineSegments(shieldWireGeo, shieldWireMat);
+    shieldGroup.add(shieldWire);
+
+    this.shieldMesh = shieldGroup;
+    this.shieldMesh.visible = false;
+    this.playerGroup.add(this.shieldMesh);
+
+    // ── 6. DYNAMIC TRAIL RIBBON ──
     const trailCount = 30;
     const trailPositions = new Float32Array(trailCount * 3);
     const trailGeo = new THREE.BufferGeometry();
@@ -1067,6 +1752,54 @@ export class GameRenderer {
       return;
     }
 
+    if (expr === 'warp') {
+      // ⚡ Space-Time Warp Visor Expression: High-Speed Hyperspace Spiral Eyes & Electrical Bolts
+      const drawWarpEye = (cx, cy, spinDir) => {
+        ctx.strokeStyle = (spinDir > 0) ? "#00ffff" : "#d500f9";
+        ctx.lineWidth = 5;
+        ctx.beginPath();
+        const rot = (Date.now() * 0.018 * spinDir);
+        for (let a = 0; a < Math.PI * 6; a += 0.28) {
+          const r = 3 + a * 4.2;
+          const x = cx + Math.cos(a + rot) * r;
+          const y = cy + Math.sin(a + rot) * r;
+          if (a === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.stroke();
+
+        // Glowing center core
+        ctx.fillStyle = "#ffffff";
+        ctx.beginPath();
+        ctx.arc(cx, cy, 6, 0, Math.PI * 2);
+        ctx.fill();
+      };
+
+      drawWarpEye(76, 110, 1);
+      drawWarpEye(180, 110, -1);
+
+      // Electric lightning energy bolts across the visor screen
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 3;
+      ctx.beginPath();
+      ctx.moveTo(30, 60); ctx.lineTo(65, 80); ctx.lineTo(55, 105); ctx.lineTo(95, 130);
+      ctx.stroke();
+
+      ctx.beginPath();
+      ctx.moveTo(226, 60); ctx.lineTo(190, 85); ctx.lineTo(205, 110); ctx.lineTo(165, 135);
+      ctx.stroke();
+
+      // Amazed/screaming open warp mouth
+      ctx.fillStyle = "#ff007f";
+      ctx.strokeStyle = "#00ffff";
+      ctx.lineWidth = 4;
+      ctx.beginPath();
+      ctx.ellipse(128, 178, 22, 30, 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+      return;
+    }
+
     if (isBlinking) {
       // Blinking slit
       ctx.fillStyle = "#00f0ff";
@@ -1194,6 +1927,30 @@ export class GameRenderer {
     for (let i = 0; i < sCount; i++) {
       this.sparkParticles.push({ x: 0, y: -999, z: 0, vx: 0, vy: 0, life: 0 });
     }
+
+    // 3. ⚡ Induction Coil Warp Plasma Particle Pool
+    this.setupInductionPlasma();
+  }
+
+  setupInductionPlasma() {
+    const plCount = 60;
+    const plGeo = new THREE.BufferGeometry();
+    const plPos = new Float32Array(plCount * 3);
+    plGeo.setAttribute('position', new THREE.BufferAttribute(plPos, 3));
+    const plMat = new THREE.PointsMaterial({
+      color: 0x00f0ff,
+      size: 0.95,
+      transparent: true,
+      opacity: 0.95,
+      blending: THREE.AdditiveBlending
+    });
+    this.plasmaPoints = new THREE.Points(plGeo, plMat);
+    this.scene.add(this.plasmaPoints);
+
+    this.plasmaStreamParticles = [];
+    for (let i = 0; i < plCount; i++) {
+      this.plasmaStreamParticles.push({ x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 0.35 });
+    }
   }
 
   setupShockwaves() {
@@ -1225,6 +1982,14 @@ export class GameRenderer {
       sw.life = 0.35;
       sw.maxLife = 0.35;
     }
+  }
+
+  // ⚡ Explosive Shockwave Pulse at Inductor Coil Exit
+  triggerExitShockwave(x, y) {
+    this.triggerShockwave(x, y, 0x00f0ff, 6.5);
+    this.triggerShockwave(x + 0.6, y, 0xd500f9, 5.0);
+    this.triggerShockwave(x + 1.2, y, 0xffffff, 4.0);
+    this.cameraTrauma = 0.8;
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -1470,7 +2235,7 @@ export class GameRenderer {
   // MAIN RENDER LOOP UPDATE
   // ═════════════════════════════════════════════════════════════════
   update(playerState, dt) {
-    const { x, y, vy, rotationZ, vehicleMode, gravityDir, isGrounded, isAlive, isThrusting } = playerState;
+    const { x, y, z, vy, rotationZ, vehicleMode, gravityDir, isGrounded, isAlive, isThrusting, isCoilTransition, coilProgress } = playerState;
     const time = this.clock.getElapsedTime();
 
     // 1. Vehicle Switching
@@ -1479,11 +2244,12 @@ export class GameRenderer {
       this.cubeMesh.visible = (vehicleMode === "cube" && isAlive);
       this.shipMesh.visible = (vehicleMode === "ship" && isAlive);
       this.waveMesh.visible = (vehicleMode === "wave" && isAlive);
+      if (this.ufoMesh) this.ufoMesh.visible = (vehicleMode === "ufo" && isAlive);
     }
 
     // 2. Player Vehicle Animation & Mesh Transform
     if (isAlive) {
-      this.playerGroup.position.set(x, y, 0);
+      this.playerGroup.position.set(x, y, (z !== undefined) ? z : 0);
 
       if (vehicleMode === "cube") {
         this.cubeMesh.visible = true;
@@ -1494,15 +2260,43 @@ export class GameRenderer {
         }
         this.prevGrounded = isGrounded;
 
-        // Smooth Elastic Spring back to (1, 1, 1) conserving volume
-        this.cubeScale.y += (1.0 - this.cubeScale.y) * Math.min(1, 16 * dt);
-        const targetSide = 1.0 / Math.sqrt(Math.max(0.35, this.cubeScale.y));
-        this.cubeScale.x += (targetSide - this.cubeScale.x) * Math.min(1, 18 * dt);
-        this.cubeScale.z += (targetSide - this.cubeScale.z) * Math.min(1, 18 * dt);
-        this.cubeBody.scale.copy(this.cubeScale);
+        if (isCoilTransition) {
+          // ⚡ Space-Time Relativistic Spaghettification & Magnetic Pinching ("bending through coil")
+          const progress = coilProgress || 0;
+          const stretch = Math.sin(progress * Math.PI);
+          // Scale X elongates up to 4.2x along track axis
+          const sx = 1.0 + stretch * 3.2;
+          // Scale Y & Z pinch down to 0.28
+          const sy = 1.0 - stretch * 0.72;
+          const sz = 1.0 - stretch * 0.72;
+          this.cubeScale.set(sx, sy, sz);
+          this.cubeBody.scale.copy(this.cubeScale);
 
-        // Snap clean 90° rotation or in-air spin
-        this.cubeBody.rotation.z = rotationZ;
+          // 3D corkscrew multi-axis roll & tilt
+          this.cubeBody.rotation.x += dt * 32.0;
+          this.cubeBody.rotation.y += dt * 24.0;
+          this.cubeBody.rotation.z += dt * 42.0;
+
+          this.faceExpression = 'warp';
+
+          // Emit induction plasma particles from rear of bending cube
+          this.emitInductionPlasma(x, y, z || 0);
+          if (Math.random() > 0.4) {
+            this.emitInductionPlasma(x, y, z || 0);
+          }
+        } else {
+          // Smooth Elastic Spring back to (1, 1, 1) conserving volume
+          this.cubeScale.y += (1.0 - this.cubeScale.y) * Math.min(1, 16 * dt);
+          const targetSide = 1.0 / Math.sqrt(Math.max(0.35, this.cubeScale.y));
+          this.cubeScale.x += (targetSide - this.cubeScale.x) * Math.min(1, 18 * dt);
+          this.cubeScale.z += (targetSide - this.cubeScale.z) * Math.min(1, 18 * dt);
+          this.cubeBody.scale.copy(this.cubeScale);
+
+          // Restore normal orientation
+          this.cubeBody.rotation.x += (0 - this.cubeBody.rotation.x) * Math.min(1, 14 * dt);
+          this.cubeBody.rotation.y += (0 - this.cubeBody.rotation.y) * Math.min(1, 14 * dt);
+          this.cubeBody.rotation.z = rotationZ;
+        }
 
         // Smurf Cat Blessed Halo
         if (this.smurfCatHalo) {
@@ -1560,10 +2354,40 @@ export class GameRenderer {
         this.waveMesh.rotation.z = waveAngle;
         this.waveMesh.rotation.x = (gravityDir < 0) ? Math.PI : 0;
       }
+      else if (vehicleMode === "ufo") {
+        if (this.ufoMesh) {
+          this.ufoMesh.visible = true;
+          // Smooth banking tilt
+          const targetTilt = Math.max(-0.45, Math.min(0.45, vy * 0.04 * gravityDir));
+          this.ufoMesh.rotation.z += (targetTilt - this.ufoMesh.rotation.z) * Math.min(1, 14 * dt);
+          this.ufoMesh.rotation.x = (gravityDir < 0 ? Math.PI : 0);
+
+          if (this.ufoRotor) {
+            this.ufoRotor.rotation.y += dt * 9.0;
+          }
+          if (this.ufoBeam) {
+            const beamPulse = 0.8 + Math.sin(time * 25) * 0.25;
+            this.ufoBeam.scale.set(beamPulse, 1.0 + Math.max(0, vy * 0.08), beamPulse);
+          }
+        }
+      }
+
+      // Energy Shield Barrier Animation
+      if (this.shieldMesh) {
+        this.shieldMesh.visible = !!playerState.hasShield;
+        if (playerState.hasShield) {
+          this.shieldMesh.rotation.y += dt * 3.0;
+          this.shieldMesh.rotation.x += dt * 1.6;
+          const s = 1.0 + Math.sin(time * 8) * 0.08;
+          this.shieldMesh.scale.set(s, s, s);
+        }
+      }
     } else {
       this.cubeMesh.visible = false;
       this.shipMesh.visible = false;
       this.waveMesh.visible = false;
+      if (this.ufoMesh) this.ufoMesh.visible = false;
+      if (this.shieldMesh) this.shieldMesh.visible = false;
     }
 
     // 3. Update Particle Systems
@@ -1583,20 +2407,28 @@ export class GameRenderer {
     // 7. Update Tung Tung Sahur Whacking Entity
     this.updateTungTung(dt, x, y);
 
-    // 8. Dynamic Camera Follow with Trauma Screen Shake
-    let camShakeX = 0, camShakeY = 0;
-    if (this.cameraTrauma > 0) {
-      this.cameraTrauma = Math.max(0, this.cameraTrauma - dt * 2.2);
-      const shakeMag = this.cameraTrauma * this.cameraTrauma * 0.8;
-      camShakeX = (Math.random() - 0.5) * shakeMag;
-      camShakeY = (Math.random() - 0.5) * shakeMag;
-    }
+    // ⚡ Update 3D Inductor Coil electromagnetic mechanics
+    this.updateInductorCoil(dt, time);
 
-    const targetCameraY = y * 0.4 + (gravityDir < 0 ? 6.5 : 4.2);
-    this.camera.position.x = x + 4.5 + camShakeX;
-    this.camera.position.y += (targetCameraY - this.camera.position.y) * Math.min(1, 8.5 * dt) + camShakeY;
-    this.camera.position.z = 15.5;
-    this.camera.lookAt(x + 5.5, this.camera.position.y * 0.85 + 0.5, 0);
+    // ⚡ If Inductor Coil Transition is running, let it control the camera & transit
+    if (this.isCoilTransition) {
+      this.updateCoilTransition(dt, time, playerState);
+    } else {
+      // 8. Dynamic Camera Follow with Trauma Screen Shake
+      let camShakeX = 0, camShakeY = 0;
+      if (this.cameraTrauma > 0) {
+        this.cameraTrauma = Math.max(0, this.cameraTrauma - dt * 2.2);
+        const shakeMag = this.cameraTrauma * this.cameraTrauma * 0.8;
+        camShakeX = (Math.random() - 0.5) * shakeMag;
+        camShakeY = (Math.random() - 0.5) * shakeMag;
+      }
+
+      const targetCameraY = y * 0.4 + (gravityDir < 0 ? 6.5 : 4.2);
+      this.camera.position.x = x + 4.5 + camShakeX;
+      this.camera.position.y += (targetCameraY - this.camera.position.y) * Math.min(1, 8.5 * dt) + camShakeY;
+      this.camera.position.z = 15.5;
+      this.camera.lookAt(x + 5.5, this.camera.position.y * 0.85 + 0.5, 0);
+    }
 
     // 8. Update Parallax Scenery Engine (Dynamic Obstacle Zones & Themed Backdrop)
     if (this.sceneryManager) {
@@ -1684,6 +2516,46 @@ export class GameRenderer {
       }
     }
 
+    // 10b. ⚡ Speed Gates, Shield Pickups & Counter-Attack Turret Orbs
+    if (this.speedGateMeshes) {
+      this.speedGateMeshes.forEach(sg => {
+        if (sg.userData && sg.userData.chevrons) {
+          sg.userData.chevrons.children.forEach((chev, cIdx) => {
+            const cOffset = ((time * 3.5 + cIdx * 0.33) % 1.0);
+            chev.position.x = -0.8 + cOffset * 1.6;
+            chev.material.opacity = 0.35 + Math.sin(cOffset * Math.PI) * 0.65;
+          });
+        }
+      });
+    }
+
+    if (this.shieldPickupMeshes) {
+      this.shieldPickupMeshes.forEach(sp => {
+        if (!sp.userData.isCollected) {
+          sp.userData.core.rotation.y += dt * 3.2;
+          sp.userData.cage.rotation.y -= dt * 2.2;
+          sp.userData.cage.rotation.x += dt * 1.6;
+          sp.position.y = sp.userData.obstacle.y + Math.sin(time * 3.5 + sp.position.x) * 0.14;
+        }
+      });
+    }
+
+    if (this.counterOrbMeshes) {
+      this.counterOrbMeshes.forEach(co => {
+        co.userData.ring1.rotation.z += dt * 4.2;
+        co.userData.ring2.rotation.y += dt * 3.8;
+        co.userData.cross.rotation.x += dt * 2.5;
+        if (co.userData.pulseVal > 0) {
+          co.userData.pulseVal -= dt * 4.0;
+          const s = 1.0 + Math.max(0, co.userData.pulseVal) * 0.4;
+          co.scale.set(s, s, s);
+        }
+      });
+    }
+
+    // 10c. ⚡ Update 3D Inductor Coil Animations (Rotors, Lightning Arcs & Pulse Rings)
+    this.updateInductorCoil(dt, time);
+
     // 11. Render Frame
     this.renderer.render(this.scene, this.camera);
   }
@@ -1713,6 +2585,20 @@ export class GameRenderer {
       s.vx = -8 - Math.random() * 6;
       s.vy = Math.random() * 3 + 1;
       s.life = 0.2;
+    }
+  }
+
+  emitInductionPlasma(x, y, z) {
+    const p = this.plasmaStreamParticles.find(item => item.life <= 0);
+    if (p) {
+      p.x = x - 0.6;
+      p.y = y + (Math.random() - 0.5) * 0.35;
+      p.z = (z !== undefined ? z : 0) + (Math.random() - 0.5) * 0.35;
+      p.vx = -18 - Math.random() * 14;
+      p.vy = (Math.random() - 0.5) * 4.5;
+      p.vz = (Math.random() - 0.5) * 4.5;
+      p.life = 0.35;
+      p.maxLife = 0.35;
     }
   }
 
@@ -1753,6 +2639,27 @@ export class GameRenderer {
       }
     });
     this.sparkPoints.geometry.attributes.position.needsUpdate = true;
+
+    // ⚡ Induction Warp Plasma Stream
+    if (this.plasmaPoints) {
+      const plArr = this.plasmaPoints.geometry.attributes.position.array;
+      this.plasmaStreamParticles.forEach((p, i) => {
+        if (p.life > 0) {
+          p.life -= dt;
+          p.x += p.vx * dt;
+          p.y += p.vy * dt;
+          p.z += p.vz * dt;
+          plArr[i * 3] = p.x;
+          plArr[i * 3 + 1] = p.y;
+          plArr[i * 3 + 2] = p.z;
+        } else {
+          plArr[i * 3] = 0;
+          plArr[i * 3 + 1] = -999;
+          plArr[i * 3 + 2] = 0;
+        }
+      });
+      this.plasmaPoints.geometry.attributes.position.needsUpdate = true;
+    }
   }
 
   updateShockwaves(dt) {

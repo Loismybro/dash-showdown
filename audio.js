@@ -1576,6 +1576,189 @@ class AudioManager {
     subOsc.stop(now + 0.35);
   }
 
+  // ⚡ High-Power Alien Inductor Coil Warp Transition Sound
+  playAlienInductorTransition(duration = 2.2) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    // Smoothly duck background music to give full dynamic headroom to the alien sound
+    if (this.musicGain) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.setValueAtTime(this.musicGain.gain.value, this.ctx.currentTime);
+        this.musicGain.gain.exponentialRampToValueAtTime(0.05, this.ctx.currentTime + 0.35);
+      } catch (e) {}
+    }
+
+    const now = this.ctx.currentTime;
+    const dur = duration;
+
+    // 1. Heavy Electromagnetic Sub-Bass Drone (Massive magnetic induction rumble)
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(40, now);
+    subOsc.frequency.exponentialRampToValueAtTime(82, now + dur);
+
+    const subFilter = this.ctx.createBiquadFilter();
+    subFilter.type = 'lowpass';
+    subFilter.frequency.setValueAtTime(85, now);
+    subFilter.frequency.exponentialRampToValueAtTime(260, now + dur);
+
+    subGain.gain.setValueAtTime(0.01, now);
+    subGain.gain.linearRampToValueAtTime(0.55, now + 0.4);
+    subGain.gain.setValueAtTime(0.55, now + dur - 0.25);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.2);
+
+    subOsc.connect(subFilter);
+    subFilter.connect(subGain);
+    subGain.connect(this.sfxGain);
+    subOsc.start(now);
+    subOsc.stop(now + dur + 0.25);
+
+    // 2. High-Power Alien FM Synthesis (Cosmic extraterrestrial mothership / tractor beam)
+    // Carrier frequency is modulated by a high-frequency modulator with extreme modulation index
+    const carrier = this.ctx.createOscillator();
+    const modulator = this.ctx.createOscillator();
+    const modGain = this.ctx.createGain();
+    const carrierGain = this.ctx.createGain();
+
+    carrier.type = 'sawtooth';
+    modulator.type = 'square';
+
+    // Carrier sweeps from menacing low alien growl to singing hyper-warp beam
+    carrier.frequency.setValueAtTime(140, now);
+    carrier.frequency.exponentialRampToValueAtTime(1250, now + dur);
+
+    // Modulator sweeps upward creating dynamic shifting alien sidebands
+    modulator.frequency.setValueAtTime(310, now);
+    modulator.frequency.exponentialRampToValueAtTime(2350, now + dur);
+
+    // High FM modulation depth
+    modGain.gain.setValueAtTime(280, now);
+    modGain.gain.exponentialRampToValueAtTime(980, now + dur * 0.85);
+
+    modulator.connect(modGain);
+    modGain.connect(carrier.frequency);
+
+    // Resonant sweeping alien bandpass filter
+    const alienFilter = this.ctx.createBiquadFilter();
+    alienFilter.type = 'bandpass';
+    alienFilter.Q.setValueAtTime(8.5, now);
+    alienFilter.frequency.setValueAtTime(360, now);
+    alienFilter.frequency.exponentialRampToValueAtTime(2950, now + dur);
+
+    carrierGain.gain.setValueAtTime(0.01, now);
+    carrierGain.gain.linearRampToValueAtTime(0.48, now + 0.25);
+    carrierGain.gain.setValueAtTime(0.48, now + dur - 0.22);
+    carrierGain.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.12);
+
+    carrier.connect(alienFilter);
+    alienFilter.connect(carrierGain);
+    carrierGain.connect(this.sfxGain);
+
+    modulator.start(now);
+    carrier.start(now);
+    modulator.stop(now + dur + 0.15);
+    carrier.stop(now + dur + 0.15);
+
+    // 3. Alien Theremin Vibrato / Sci-Fi Energy Beam
+    const thereminOsc = this.ctx.createOscillator();
+    const thereminGain = this.ctx.createGain();
+    const lfo = this.ctx.createOscillator();
+    const lfoGain = this.ctx.createGain();
+
+    thereminOsc.type = 'sine';
+    thereminOsc.frequency.setValueAtTime(460, now);
+    thereminOsc.frequency.exponentialRampToValueAtTime(1920, now + dur);
+
+    // 9.5 Hz extraterrestrial vibrato
+    lfo.type = 'sine';
+    lfo.frequency.setValueAtTime(9.5, now);
+    lfoGain.gain.setValueAtTime(45, now);
+    lfoGain.gain.exponentialRampToValueAtTime(140, now + dur);
+
+    lfo.connect(lfoGain);
+    lfoGain.connect(thereminOsc.frequency);
+
+    thereminGain.gain.setValueAtTime(0.01, now);
+    thereminGain.gain.linearRampToValueAtTime(0.26, now + 0.3);
+    thereminGain.gain.setValueAtTime(0.26, now + dur - 0.15);
+    thereminGain.gain.exponentialRampToValueAtTime(0.001, now + dur + 0.1);
+
+    thereminOsc.connect(thereminGain);
+    thereminGain.connect(this.sfxGain);
+
+    lfo.start(now);
+    thereminOsc.start(now);
+    lfo.stop(now + dur + 0.15);
+    thereminOsc.stop(now + dur + 0.15);
+
+    // 4. Crackling High-Voltage Electric Arc Snaps
+    const snapCount = 8;
+    for (let i = 0; i < snapCount; i++) {
+      const snapTime = now + (i / snapCount) * (dur * 0.9) + Math.random() * 0.06;
+      try {
+        const snapNoise = this.ctx.createBufferSource();
+        const buffer = this.ctx.createBuffer(1, Math.floor(this.ctx.sampleRate * 0.055), this.ctx.sampleRate);
+        const data = buffer.getChannelData(0);
+        for (let s = 0; s < data.length; s++) {
+          data[s] = (Math.random() * 2 - 1) * Math.exp(-s / (data.length * 0.22));
+        }
+        snapNoise.buffer = buffer;
+
+        const snapFilter = this.ctx.createBiquadFilter();
+        snapFilter.type = 'highpass';
+        snapFilter.frequency.setValueAtTime(3400 + Math.random() * 2200, snapTime);
+
+        const snapGain = this.ctx.createGain();
+        snapGain.gain.setValueAtTime(0.24, snapTime);
+        snapGain.gain.exponentialRampToValueAtTime(0.001, snapTime + 0.05);
+
+        snapNoise.connect(snapFilter);
+        snapFilter.connect(snapGain);
+        snapGain.connect(this.sfxGain);
+
+        snapNoise.start(snapTime);
+        snapNoise.stop(snapTime + 0.055);
+      } catch (err) {}
+    }
+
+    // 5. Warp Exit Breach Sonic Boom (Fires right at coil exit threshold)
+    const breachTime = now + dur - 0.18;
+    const boomOsc = this.ctx.createOscillator();
+    const boomGain = this.ctx.createGain();
+    boomOsc.type = 'triangle';
+    boomOsc.frequency.setValueAtTime(175, breachTime);
+    boomOsc.frequency.exponentialRampToValueAtTime(28, breachTime + 0.65);
+
+    boomGain.gain.setValueAtTime(0.78, breachTime);
+    boomGain.gain.exponentialRampToValueAtTime(0.001, breachTime + 0.7);
+
+    boomOsc.connect(boomGain);
+    boomGain.connect(this.sfxGain);
+
+    boomOsc.start(breachTime);
+    boomOsc.stop(breachTime + 0.72);
+
+    // Cosmic laser shimmer sweep
+    const shimmerOsc = this.ctx.createOscillator();
+    const shimmerGain = this.ctx.createGain();
+    shimmerOsc.type = 'sine';
+    shimmerOsc.frequency.setValueAtTime(3400, breachTime);
+    shimmerOsc.frequency.exponentialRampToValueAtTime(110, breachTime + 0.45);
+
+    shimmerGain.gain.setValueAtTime(0.36, breachTime);
+    shimmerGain.gain.exponentialRampToValueAtTime(0.001, breachTime + 0.45);
+
+    shimmerOsc.connect(shimmerGain);
+    shimmerGain.connect(this.sfxGain);
+
+    shimmerOsc.start(breachTime);
+    shimmerOsc.stop(breachTime + 0.48);
+  }
+
   // Level Complete Victory Fanfare
   playVictory() {
     if (this.muted) return;
@@ -1653,6 +1836,241 @@ class AudioManager {
 
     osc.start(now);
     osc.stop(now + 0.11);
+  }
+
+  // 🛸 UFO Mode Anti-Gravity Jump Hop
+  playUfoHop() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(520, now);
+    osc.frequency.exponentialRampToValueAtTime(1280, now + 0.08);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.13);
+  }
+
+  // ⚡ Speed Boost Gate Whoosh
+  playSpeedGate(mult = 2.0) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(180, now);
+    osc.frequency.exponentialRampToValueAtTime(320 * mult, now + 0.22);
+
+    gain.gain.setValueAtTime(0.4, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  // 🛡️ Shield Collect Chime
+  playShieldCollect() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(freq, now + i * 0.04);
+
+      gain.gain.setValueAtTime(0.2, now + i * 0.04);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.04 + 0.25);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+
+      osc.start(now + i * 0.04);
+      osc.stop(now + i * 0.04 + 0.26);
+    });
+  }
+
+  // 🛡️ Shield Deflect & Shatter Barrier
+  playShieldBreak() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(800, now);
+    osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
+
+    gain.gain.setValueAtTime(0.45, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.24);
+  }
+
+  // 👾 Boss Warning Siren Alert
+  playBossAlert() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    for (let i = 0; i < 2; i++) {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = 'sawtooth';
+      const t = now + i * 0.28;
+      osc.frequency.setValueAtTime(740, t);
+      osc.frequency.linearRampToValueAtTime(420, t + 0.22);
+
+      gain.gain.setValueAtTime(0.35, t);
+      gain.gain.exponentialRampToValueAtTime(0.001, t + 0.26);
+
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+
+      osc.start(t);
+      osc.stop(t + 0.27);
+    }
+  }
+
+  // 🔴 Boss Death Laser Capacitor Charge
+  playLaserCharge() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(240, now);
+    osc.frequency.exponentialRampToValueAtTime(2400, now + 1.1);
+
+    gain.gain.setValueAtTime(0.05, now);
+    gain.gain.linearRampToValueAtTime(0.35, now + 1.0);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.15);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 1.16);
+  }
+
+  // 💥 Boss Death Laser Fire Blast
+  playLaserFire() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(420, now);
+    osc.frequency.exponentialRampToValueAtTime(32, now + 0.55);
+
+    gain.gain.setValueAtTime(0.65, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.6);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.62);
+  }
+
+  // 🚀 Player Counter-Attack Missile Fire
+  playCounterAttack() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(320, now);
+    osc.frequency.exponentialRampToValueAtTime(1450, now + 0.18);
+
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.2);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.22);
+  }
+
+  // 💥 Boss Impact Damage Taken
+  playBossHit() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(120, now);
+    osc.frequency.exponentialRampToValueAtTime(28, now + 0.25);
+
+    gain.gain.setValueAtTime(0.55, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.28);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 0.3);
+  }
+
+  // 🌋 Cataclysmic Boss Destruction Explosion
+  playBossExplode() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(90, now);
+    osc.frequency.exponentialRampToValueAtTime(18, now + 1.4);
+
+    gain.gain.setValueAtTime(0.85, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5);
+
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+
+    osc.start(now);
+    osc.stop(now + 1.55);
   }
 }
 

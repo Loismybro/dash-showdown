@@ -5,15 +5,18 @@ import { audio } from './audio.js';
 import { GameRenderer } from './renderer.js';
 import { DifficultyBadges } from './difficulty_badges.js';
 import { MultiplayerManager } from './multiplayer.js';
+import { BossManager } from './boss.js';
 
 class GameManager {
   constructor() {
     this.renderer = null;
+    this.bossManager = null;
 
     // Levels
     this.levels = LEVEL_DATA;
     this.currentLevelIndex = 0;
     this.level = this.levels[0];
+    this.currentSpeedMult = 1.0;
 
     // Player State
     this.player = {
@@ -22,8 +25,10 @@ class GameManager {
       vx: 10.5,
       vy: 0,
       rotationZ: 0,
-      vehicleMode: "cube", // "cube", "ship", "wave"
+      vehicleMode: "cube", // "cube", "ship", "wave", "ufo"
       gravityDir: 1,       // 1 = normal (floor), -1 = inverted (ceiling)
+      hasShield: false,
+      invulnerableTimer: 0,
       isGrounded: true,
       isHolding: false,
       isAlive: true,
@@ -36,7 +41,7 @@ class GameManager {
 
     // Stats & Attempts
     this.attempts = 1;
-    this.bestScores = [0, 0, 0, 0];
+    this.bestScores = [0, 0, 0, 0, 0];
     this.loadBestScores();
 
     // Gem Collection System
@@ -71,8 +76,16 @@ class GameManager {
 
     // Timing & Game State
     this.lastTime = 0;
-    this.gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'CRASHED', 'VICTORY'
+    this.gameState = 'MENU'; // 'MENU', 'PLAYING', 'PAUSED', 'CRASHED', 'VICTORY', 'COIL_TRANSITION'
     this.respawnTimer = 0;
+
+    // ⚡ High-Power Inductor Coil Transition State
+    this.coilTransitionTimer = 0;
+    this.coilTransitionDuration = 2.2;
+    this.coilStartX = 0;
+    this.coilLength = 26.0;
+    this.coilTargetY = 2.8;
+    this.coilProgress = 0;
 
     // Controls & Game Feel Juice: Jump Buffering & Coyote Time
     this.jumpBufferTimer = 0;
@@ -97,6 +110,9 @@ class GameManager {
     // 1. Initialize 3D Engine
     this.renderer = new GameRenderer('canvas-container');
     this.renderer.init();
+
+    // 1b. Initialize Interactive Boss Battle Engine
+    this.bossManager = new BossManager(this.renderer.scene, this.renderer);
 
     // 2. Bind Controls (Touch screen, Space, Click, Pause)
     this.bindControls();
@@ -261,9 +277,15 @@ class GameManager {
     try {
       const saved = localStorage.getItem('dash_showdown_scores');
       if (saved) {
-        this.bestScores = JSON.parse(saved);
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed)) {
+          this.bestScores = parsed;
+        }
       }
     } catch (e) {}
+    while (this.bestScores.length < this.levels.length) {
+      this.bestScores.push(0);
+    }
   }
 
   saveBestScores() {
@@ -275,6 +297,8 @@ class GameManager {
   loadLevel(index) {
     this.currentLevelIndex = index;
     this.level = this.levels[index];
+    this.level.baseSpeed = this.level.baseSpeed || this.level.speed;
+    this.currentSpeedMult = 1.0;
     this.checkpoints = [];
     this.totalLevelGems = this.level.obstacles.filter(o => o.type === 'gem').length;
     this.gemsCollected.clear();
@@ -378,23 +402,84 @@ class GameManager {
       }
       this.player.x = 0;
       this.player.y = (this.level.defaultVehicle === "cube" ? 0 : 2);
+      this.currentSpeedMult = 1.0;
+      if (this.level.baseSpeed) {
+        this.level.speed = this.level.baseSpeed;
+      }
       this.player.vx = this.level.speed;
       this.player.vy = 0;
       this.player.rotationZ = 0;
       this.player.vehicleMode = this.level.defaultVehicle || "cube";
       this.player.gravityDir = 1;
+      this.player.hasShield = false;
+      this.player.invulnerableTimer = 0;
       this.player.isGrounded = true;
       this.player.isAlive = true;
       this.player.orbTriggered.clear();
       audio.updateShipThrust(0);
+
+      // Reset boss entity
+      if (this.bossManager) {
+        this.bossManager.reset();
+      }
+
+      // Reset shield pickups
+      this.level.obstacles.forEach(o => {
+        if (o.type === 'shield') o.collected = false;
+      });
+      if (this.renderer && this.renderer.shieldPickupMeshes) {
+        this.renderer.shieldPickupMeshes.forEach(sp => {
+          sp.userData.isCollected = false;
+          sp.visible = true;
+        });
+      }
+
+      const shieldInd = document.getElementById('player-shield-indicator');
+      if (shieldInd) shieldInd.style.display = 'none';
     }
     this.jumpBufferTimer = 0;
     this.coyoteTimer = 0;
+    this.player.z = 0;
+    this.coilProgress = 0;
+    this.coilTransitionTimer = 0;
+    if (this.renderer) {
+      this.renderer.isCoilTransition = false;
+      this.renderer.coilProgress = 0;
+      if (this.renderer.camera) {
+        this.renderer.camera.fov = this.renderer.defaultCameraFov;
+        this.renderer.camera.rotation.z = 0;
+        this.renderer.camera.updateProjectionMatrix();
+      }
+    }
+    const warpOverlay = document.getElementById('coil-warp-overlay');
+    if (warpOverlay) {
+      warpOverlay.classList.remove('warp-active');
+      warpOverlay.style.display = 'none';
+    }
     this.gameState = 'PLAYING';
   }
 
   onPlayerCrash() {
     if (!this.player.isAlive) return;
+
+    // 🛡️ Active Energy Shield absorbs death impact!
+    if (this.player.hasShield) {
+      this.player.hasShield = false;
+      this.player.invulnerableTimer = 0.9;
+      audio.playShieldBreak();
+      if (this.renderer) {
+        this.renderer.triggerShockwave(this.player.x, this.player.y + 0.5, 0x00f0ff, 4.2);
+        this.renderer.triggerScreenFlash(0.4);
+      }
+      const shieldInd = document.getElementById('player-shield-indicator');
+      if (shieldInd) shieldInd.style.display = 'none';
+      return;
+    }
+
+    // Grace period check from recent shield break
+    if (this.player.invulnerableTimer && this.player.invulnerableTimer > 0) {
+      return;
+    }
 
     this.player.isAlive = false;
 
@@ -577,6 +662,96 @@ class GameManager {
       this.dom.memeChaosModal.style.display = 'none';
     }
   }
+  // -------------------------------------------------------------
+  // ⚡ HIGH-POWER INDUCTOR COIL LEVEL FINISH TRANSITION
+  // -------------------------------------------------------------
+  startInductorCoilTransition() {
+    if (this.gameState === 'COIL_TRANSITION' || this.gameState === 'VICTORY') return;
+
+    this.gameState = 'COIL_TRANSITION';
+    this.coilTransitionTimer = 0;
+    this.coilTransitionDuration = 2.4;
+    this.coilStartX = this.player.x;
+    this.coilLength = 26.0;
+    this.coilTargetY = 2.8; // Coil center tunnel axis
+    this.coilProgress = 0;
+
+    // Morph to iconic cube mode for the space-time bending experience
+    this.player.vehicleMode = 'cube';
+    this.player.isHolding = false;
+    this.player.isGrounded = false;
+    audio.stopShipHum();
+
+    // Fire high-power alien sound with FM sweep, resonant filter, sub drone, electric arc snaps, and breach boom!
+    audio.playAlienInductorTransition(this.coilTransitionDuration);
+
+    // ⚡ Trigger 3D renderer camera FOV warp and relativistic tunnel transit
+    if (this.renderer && typeof this.renderer.startCoilTransition === 'function') {
+      this.renderer.startCoilTransition(this.player, this.coilTransitionDuration, () => {
+        this.finishInductorCoilTransition();
+      });
+    }
+
+    // Show visual warp overlay HUD
+    const warpOverlay = document.getElementById('coil-warp-overlay');
+    if (warpOverlay) {
+      warpOverlay.style.display = 'flex';
+      setTimeout(() => warpOverlay.classList.add('warp-active'), 10);
+    }
+  }
+
+  updateCoilTransition(dt) {
+    this.coilTransitionTimer += dt;
+    const progress = Math.min(1.0, this.coilTransitionTimer / this.coilTransitionDuration);
+    this.coilProgress = progress;
+
+    // 1. Relativistic acceleration through the inductor coil
+    const easeP = progress * progress * (3 - 2 * progress);
+    this.player.x = this.coilStartX + easeP * (this.coilLength + 8.0);
+
+    // 2. Magnetic central alignment
+    const alignWeight = Math.min(1.0, progress * 4.5);
+    const targetBaseY = this.coilTargetY;
+    this.player.y = (1.0 - alignWeight) * this.player.y + alignWeight * targetBaseY;
+
+    // 3. Space-Time Bending Sinusoidal Corkscrew Wave ("bending through coil")
+    const bendEnvelope = Math.sin(progress * Math.PI);
+    const waveFreq = 26.0;
+    const bendAmp = 0.55 * bendEnvelope;
+    this.player.y += Math.sin(this.coilTransitionTimer * waveFreq) * bendAmp * dt * 25.0;
+    this.player.z = Math.cos(this.coilTransitionTimer * waveFreq) * bendAmp;
+
+    // 4. Rapid relativistic multi-axis spin
+    this.player.rotationZ -= (18.0 + progress * 28.0) * dt;
+
+    // 5. Check transition complete (fallback in case renderer callback didn't trigger)
+    if (progress >= 1.0 && this.gameState === 'COIL_TRANSITION') {
+      this.finishInductorCoilTransition();
+    }
+  }
+
+  finishInductorCoilTransition() {
+    if (this.gameState === 'VICTORY') return;
+    this.player.z = 0;
+    this.coilProgress = 1.0;
+
+    // Hide warp overlay
+    const warpOverlay = document.getElementById('coil-warp-overlay');
+    if (warpOverlay) {
+      warpOverlay.classList.remove('warp-active');
+      setTimeout(() => {
+        warpOverlay.style.display = 'none';
+      }, 350);
+    }
+
+    // Trigger explosive shockwave pulse at inductor coil exit
+    if (this.renderer) {
+      this.renderer.triggerExitShockwave(this.level.endX + 26.0, 2.8);
+    }
+
+    // Trigger level victory fanfare and modal
+    this.onPlayerVictory();
+  }
 
   onPlayerVictory() {
     this.gameState = 'VICTORY';
@@ -668,6 +843,13 @@ class GameManager {
         this.resetPlayer(true);
       } else if (e.code === 'KeyM') {
         this.toggleMute();
+      } else if (e.code === 'KeyT') {
+        // ⚡ Dev/Practice shortcut: teleport to Inductor Coil entrance
+        if (this.gameState === 'PLAYING') {
+          this.player.x = this.level.endX - 3.5;
+          this.player.y = 0;
+          this.player.vy = 0;
+        }
       }
     });
 
@@ -995,12 +1177,26 @@ class GameManager {
     const orbRadius = 2.4; // Generous trigger radius
     for (let i = 0; i < this.level.obstacles.length; i++) {
       const obs = this.level.obstacles[i];
-      if (obs.type === 'orb') {
+      if (obs.type === 'orb' || obs.type === 'counter_orb') {
         const dx = p.x - obs.x;
         const dy = (p.y + 0.5 * p.gravityDir) - obs.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
         if (dist <= orbRadius && !p.orbTriggered.has(i)) {
           p.orbTriggered.add(i);
+
+          if (obs.type === 'counter_orb') {
+            const turretMesh = this.renderer.counterOrbMeshes?.find(m => m.userData.obstacle === obs);
+            if (turretMesh && turretMesh.userData.triggerTurret) {
+              turretMesh.userData.triggerTurret();
+            }
+            if (this.bossManager) {
+              this.bossManager.fireCounterMissile(p.x, p.y + 0.5);
+            }
+            p.vy = 16.5 * p.gravityDir;
+            p.isGrounded = false;
+            return true;
+          }
+
           audio.playOrbChime();
 
           // Trigger Squash & Orb Shockwave
@@ -1052,6 +1248,11 @@ class GameManager {
     } else if (this.player.vehicleMode === 'wave') {
       // Detonate sharp turn shockwave at vertex
       this.renderer.triggerShockwave(this.player.x, this.player.y, 0xd500f9, 2.2);
+    } else if (this.player.vehicleMode === 'ufo') {
+      this.player.vy = 12.5 * this.player.gravityDir;
+      audio.playUfoHop();
+      this.renderer.triggerJumpSquash();
+      this.renderer.triggerShockwave(this.player.x, this.player.y, 0xffa500, 2.0);
     }
   }
 
@@ -1118,7 +1319,7 @@ class GameManager {
         <div class="level-card-desc">${lvl.desc}</div>
         <div class="level-card-meta">
           <span>🎵 ${lvl.bpm} BPM</span>
-          <span>🏆 Best: ${this.bestScores[idx]}%</span>
+          <span>🏆 Best: ${this.bestScores[idx] || 0}%</span>
         </div>
       `;
       card.addEventListener('click', () => {
@@ -1139,6 +1340,11 @@ class GameManager {
   // -------------------------------------------------------------
 
   updatePhysics(dt) {
+    if (this.gameState === 'COIL_TRANSITION') {
+      this.updateCoilTransition(dt);
+      return;
+    }
+
     if (this.gameState !== 'PLAYING' || !this.player.isAlive) {
       if (this.gameState === 'CRASHED') {
         this.respawnTimer -= dt;
@@ -1149,6 +1355,10 @@ class GameManager {
       return;
     }
 
+    if (this.player.invulnerableTimer && this.player.invulnerableTimer > 0) {
+      this.player.invulnerableTimer -= dt;
+    }
+
     // Substep integration for high-speed accuracy
     const substeps = 3;
     const subDt = dt / substeps;
@@ -1157,9 +1367,27 @@ class GameManager {
       if (!this.player.isAlive) break;
     }
 
-    // Check Victory Reached
+    // 👾 Check Interactive Boss Battle Encounter
+    if (this.level.hasBoss && this.bossManager) {
+      if (!this.bossManager.active && this.bossManager.state === 'dormant' && this.player.x >= (this.level.bossTriggerX || 780)) {
+        this.bossManager.spawnBoss(this.player.x, 5.0);
+      }
+      if (this.bossManager.active) {
+        this.bossManager.update(dt, this.player, this.level.speed);
+
+        // Check boss collision / laser hits
+        if (this.player.isAlive && (!this.player.invulnerableTimer || this.player.invulnerableTimer <= 0)) {
+          const bossHit = this.bossManager.checkCollision(this.player.x, this.player.y + 0.5);
+          if (bossHit) {
+            this.onPlayerCrash();
+          }
+        }
+      }
+    }
+
+    // ⚡ Check Inductor Coil Warp Transition Reached
     if (this.player.x >= this.level.endX && this.gameState === 'PLAYING') {
-      this.onPlayerVictory();
+      this.startInductorCoilTransition();
     }
   }
 
@@ -1230,6 +1458,13 @@ class GameManager {
       p.vy = waveVy;
       p.y += p.vy * dt;
     }
+    else if (p.vehicleMode === 'ufo') {
+      const ufoGravity = -32.0 * p.gravityDir;
+      p.vy += ufoGravity * dt;
+      p.vy = Math.max(-13, Math.min(13, p.vy));
+      p.y += p.vy * dt;
+      p.rotationZ = (p.vy / 13.0) * 0.35 * p.gravityDir;
+    }
 
     // 4. World Boundary Collisions
     const ceilY = (this.level.id === 2 ? 9.0 : 10.0);
@@ -1242,7 +1477,7 @@ class GameManager {
           this.renderer.triggerLandingSquash();
         }
         p.y = floorY;
-        p.vy = 0;
+        p.vy = (p.vehicleMode === 'ufo' ? Math.max(0, p.vy) : 0);
         p.isGrounded = true;
       } else {
         p.isGrounded = false;
@@ -1265,7 +1500,7 @@ class GameManager {
           this.renderer.triggerLandingSquash();
         }
         p.y = ceilY - 1.0;
-        p.vy = 0;
+        p.vy = (p.vehicleMode === 'ufo' ? Math.min(0, p.vy) : 0);
         p.isGrounded = true;
       } else {
         p.isGrounded = false;
@@ -1397,13 +1632,15 @@ class GameManager {
               this.onPlayerCrash();
               return;
             }
-          } else if (p.vehicleMode === 'ship') {
+          } else if (p.vehicleMode === 'ship' || p.vehicleMode === 'ufo') {
             if (p.gravityDir === 1 && playerBottom >= top - 0.45) {
               p.y = top;
               p.vy = Math.max(0, p.vy);
+              p.isGrounded = true;
             } else if (p.gravityDir === -1 && playerTop <= bottom + 0.45) {
               p.y = bottom - 1.0;
               p.vy = Math.min(0, p.vy);
+              p.isGrounded = true;
             } else {
               this.onPlayerCrash();
               return;
@@ -1486,6 +1723,11 @@ class GameManager {
             p.vehicleMode = 'cube';
             audio.updateShipThrust(0);
             audio.playPadLaunch();
+          } else if (obs.subType === 'ufo' && p.vehicleMode !== 'ufo') {
+            p.vehicleMode = 'ufo';
+            audio.updateShipThrust(0);
+            audio.playPadLaunch();
+            this.renderer.triggerShockwave(obs.x, obs.y, 0xffa500, 2.8);
           } else if (obs.subType === 'gravity_up' && p.gravityDir !== -1) {
             p.gravityDir = -1;
             audio.playGravityFlip(true);
@@ -1495,6 +1737,32 @@ class GameManager {
             audio.playGravityFlip(false);
             audio.playVineBoom();
           }
+        }
+      }
+      else if (obs.type === 'speed_gate') {
+        if (Math.abs(px - obs.x) < 1.0 && Math.abs(py - (obs.y + 2.5)) < 3.2) {
+          if (this.currentSpeedMult !== obs.speedMult) {
+            this.currentSpeedMult = obs.speedMult;
+            this.level.speed = (this.level.baseSpeed || 11.0) * obs.speedMult;
+            audio.playSpeedGate(obs.speedMult);
+            this.renderer.triggerShockwave(obs.x, py, 0x00ffff, 3.8);
+            this.renderer.triggerScreenFlash(0.2);
+          }
+        }
+      }
+      else if (obs.type === 'shield') {
+        if (!obs.collected && Math.abs(px - obs.x) < 1.4 && Math.abs(py - obs.y) < 1.4) {
+          obs.collected = true;
+          p.hasShield = true;
+          const shieldMesh = this.renderer.shieldPickupMeshes?.find(m => m.userData.obstacle === obs);
+          if (shieldMesh) {
+            shieldMesh.userData.isCollected = true;
+            shieldMesh.visible = false;
+          }
+          audio.playShieldCollect();
+          this.renderer.triggerShockwave(obs.x, obs.y, 0x00f0ff, 3.4);
+          const shieldInd = document.getElementById('player-shield-indicator');
+          if (shieldInd) shieldInd.style.display = 'block';
         }
       }
     }
@@ -2226,13 +2494,17 @@ class GameManager {
     this.renderer.update({
       x: this.player.x,
       y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
+      z: this.player.z || 0,
       vy: this.player.vy,
       rotationZ: this.player.rotationZ,
       vehicleMode: this.player.vehicleMode,
       gravityDir: this.player.gravityDir,
+      hasShield: this.player.hasShield,
       isGrounded: this.player.isGrounded,
       isAlive: this.player.isAlive,
-      isThrusting: this.player.isHolding
+      isThrusting: this.player.isHolding,
+      isCoilTransition: (this.gameState === 'COIL_TRANSITION'),
+      coilProgress: this.coilProgress || 0
     }, dt);
 
     // 4. Update HUD and Leaderboard
