@@ -1528,6 +1528,143 @@ class AudioManager {
     osc.stop(now + 0.19);
   }
 
+  // 🌪️ Aero Fan High-Tech Aerodynamic Updraft Whoosh
+  playAeroFanLift(volume = 0.45) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    // Rate-limit continuous updraft triggers to at most every 140ms
+    const now = this.ctx.currentTime;
+    if (this._lastFanLiftTime && now - this._lastFanLiftTime < 0.14) return;
+    this._lastFanLiftTime = now;
+
+    // 1. Soaring resonant wind band
+    const bSize = Math.floor(this.ctx.sampleRate * 0.22);
+    const nBuf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+    const d = nBuf.getChannelData(0);
+    for (let i = 0; i < bSize; i++) d[i] = Math.random() * 2 - 1;
+    const nSrc = this.ctx.createBufferSource();
+    nSrc.buffer = nBuf;
+
+    const bpf = this.ctx.createBiquadFilter();
+    bpf.type = 'bandpass';
+    bpf.frequency.setValueAtTime(950, now);
+    bpf.frequency.exponentialRampToValueAtTime(2400, now + 0.18);
+    bpf.Q.setValueAtTime(4.0, now);
+
+    const nGain = this.ctx.createGain();
+    nGain.gain.setValueAtTime(0.32 * volume, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.21);
+
+    nSrc.connect(bpf);
+    bpf.connect(nGain);
+    nGain.connect(this.sfxGain);
+    nSrc.start(now);
+    nSrc.stop(now + 0.22);
+
+    // 2. High-Tech Turbine Harmonic Whistle
+    const osc = this.ctx.createOscillator();
+    const oscGain = this.ctx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(540, now);
+    osc.frequency.exponentialRampToValueAtTime(1180, now + 0.16);
+    oscGain.gain.setValueAtTime(0.22 * volume, now);
+    oscGain.gain.exponentialRampToValueAtTime(0.001, now + 0.18);
+    osc.connect(oscGain);
+    oscGain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.19);
+  }
+
+  // 🚀 Aero Boost Jump Impulse while inside Fan Column
+  playAeroBoost() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(440, now);
+    osc.frequency.exponentialRampToValueAtTime(1320, now + 0.12);
+    gain.gain.setValueAtTime(0.48, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.24);
+  }
+
+  // 🌋 Molten Lava Sizzle & Incineration Vaporize Sound
+  playLavaSizzle() {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    const bSize = Math.floor(this.ctx.sampleRate * 0.45);
+    const nBuf = this.ctx.createBuffer(1, bSize, this.ctx.sampleRate);
+    const d = nBuf.getChannelData(0);
+    for (let i = 0; i < bSize; i++) {
+      d[i] = (Math.random() * 2 - 1) * Math.exp(-i / (this.ctx.sampleRate * 0.12));
+    }
+    const nSrc = this.ctx.createBufferSource();
+    nSrc.buffer = nBuf;
+
+    const hpf = this.ctx.createBiquadFilter();
+    hpf.type = 'highpass';
+    hpf.frequency.setValueAtTime(1600, now);
+    hpf.frequency.exponentialRampToValueAtTime(800, now + 0.35);
+
+    const nGain = this.ctx.createGain();
+    nGain.gain.setValueAtTime(0.65, now);
+    nGain.gain.exponentialRampToValueAtTime(0.001, now + 0.42);
+
+    nSrc.connect(hpf);
+    hpf.connect(nGain);
+    nGain.connect(this.sfxGain);
+    nSrc.start(now);
+    nSrc.stop(now + 0.44);
+
+    // Deep boiling volcanic pop
+    const popOsc = this.ctx.createOscillator();
+    const popGain = this.ctx.createGain();
+    popOsc.type = 'sawtooth';
+    popOsc.frequency.setValueAtTime(220, now);
+    popOsc.frequency.exponentialRampToValueAtTime(55, now + 0.28);
+    popGain.gain.setValueAtTime(0.5, now);
+    popGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    popOsc.connect(popGain);
+    popGain.connect(this.sfxGain);
+    popOsc.start(now);
+    popOsc.stop(now + 0.34);
+  }
+
+  // 🪜 Tactile Mechanical Stair Step
+  playStairStep(pitchMult = 1.0) {
+    if (this.muted) return;
+    this.init();
+    if (!this.ctx) return;
+
+    const now = this.ctx.currentTime;
+    if (this._lastStepTime && now - this._lastStepTime < 0.07) return;
+    this._lastStepTime = now;
+
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(320 * pitchMult, now);
+    osc.frequency.exponentialRampToValueAtTime(160 * pitchMult, now + 0.035);
+    gain.gain.setValueAtTime(0.22, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.04);
+    osc.connect(gain);
+    gain.connect(this.sfxGain);
+    osc.start(now);
+    osc.stop(now + 0.045);
+  }
+
   // Crash / Shatter Explosion
   playCrash() {
     if (this.muted) return;
@@ -1908,27 +2045,41 @@ class AudioManager {
     });
   }
 
-  // 🛡️ Shield Deflect & Shatter Barrier
+  // 🛡️ Shield Deflect & Shatter Barrier (Sub-Bass Thump + Shimmering Crystal Burst)
   playShieldBreak() {
     if (this.muted) return;
     this.init();
     if (!this.ctx) return;
 
     const now = this.ctx.currentTime;
-    const osc = this.ctx.createOscillator();
-    const gain = this.ctx.createGain();
-    osc.type = 'sawtooth';
-    osc.frequency.setValueAtTime(800, now);
-    osc.frequency.exponentialRampToValueAtTime(80, now + 0.2);
 
-    gain.gain.setValueAtTime(0.45, now);
-    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.22);
+    // 1. Heavy Sub-Bass Deflection Thump
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(175, now);
+    subOsc.frequency.exponentialRampToValueAtTime(32, now + 0.28);
+    subGain.gain.setValueAtTime(0.75, now);
+    subGain.gain.exponentialRampToValueAtTime(0.001, now + 0.32);
+    subOsc.connect(subGain);
+    subGain.connect(this.sfxGain);
+    subOsc.start(now);
+    subOsc.stop(now + 0.33);
 
-    osc.connect(gain);
-    gain.connect(this.sfxGain);
-
-    osc.start(now);
-    osc.stop(now + 0.24);
+    // 2. High-Frequency Crystal Shard Shatter
+    [1480, 1120, 840, 560].forEach((freq, idx) => {
+      const osc = this.ctx.createOscillator();
+      const gain = this.ctx.createGain();
+      osc.type = (idx % 2 === 0) ? 'sawtooth' : 'triangle';
+      osc.frequency.setValueAtTime(freq, now + idx * 0.015);
+      osc.frequency.exponentialRampToValueAtTime(freq * 0.25, now + idx * 0.015 + 0.22);
+      gain.gain.setValueAtTime(0.35, now + idx * 0.015);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + idx * 0.015 + 0.24);
+      osc.connect(gain);
+      gain.connect(this.sfxGain);
+      osc.start(now + idx * 0.015);
+      osc.stop(now + idx * 0.015 + 0.25);
+    });
   }
 
   // 👾 Boss Warning Siren Alert

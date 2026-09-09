@@ -63,6 +63,13 @@ export class GameRenderer {
     this.padMeshes = [];
     this.checkpointMeshes = [];
     this.spikeMeshes = [];
+    this.stairMeshes = [];
+    this.fanMeshes = [];
+    this.lavaMeshes = [];
+    this.lavaCanvas = null;
+    this.lavaCtx = null;
+    this.lavaTexture = null;
+    this.lastLavaTextureTime = 0;
     this.shockwaves = []; // Dynamic expanding rings for pads/orbs/turns
 
     // ⚡ Massive 3D Sci-Fi Inductor Coil Transition Rig
@@ -199,6 +206,9 @@ export class GameRenderer {
     // 11. Tung Tung Sahur 3D Meme Whacking Rig
     this.setupTungTungCharacter();
 
+    // 11b. 🌋 Dynamic Churning Procedural Lava Texture Engine
+    this.setupLavaTexture();
+
     // 12. Window & Mobile Viewport Resize
     window.addEventListener('resize', () => this.onWindowResize());
     if (window.visualViewport) {
@@ -207,6 +217,59 @@ export class GameRenderer {
     window.addEventListener('orientationchange', () => {
       setTimeout(() => this.onWindowResize(), 150);
     });
+  }
+
+  // 🌋 High-Performance Animated Procedural Magma Texture Canvas
+  setupLavaTexture() {
+    this.lavaCanvas = document.createElement('canvas');
+    this.lavaCanvas.width = 128;
+    this.lavaCanvas.height = 64;
+    this.lavaCtx = this.lavaCanvas.getContext('2d');
+    this.lavaTexture = new THREE.CanvasTexture(this.lavaCanvas);
+    this.lavaTexture.wrapS = THREE.RepeatWrapping;
+    this.lavaTexture.wrapT = THREE.RepeatWrapping;
+    this.lavaTexture.repeat.set(2, 1);
+    this.updateLavaTexture(0);
+  }
+
+  updateLavaTexture(time) {
+    if (!this.lavaCtx) return;
+    const ctx = this.lavaCtx;
+    const w = 128, h = 64;
+    const imgData = ctx.createImageData(w, h);
+    const data = imgData.data;
+
+    for (let y = 0; y < h; y++) {
+      for (let x = 0; x < w; x++) {
+        const nx = x * 0.085;
+        const ny = y * 0.12;
+        const v1 = Math.sin(nx + time * 2.2);
+        const v2 = Math.sin(ny - time * 1.8);
+        const v3 = Math.sin((nx + ny) * 0.8 + time * 3.0);
+        const v = (v1 + v2 + v3 + 3) / 6.0;
+
+        const idx = (y * w + x) * 4;
+        if (v < 0.42) {
+          const t = v / 0.42;
+          data[idx] = Math.floor(180 + t * 75);
+          data[idx + 1] = Math.floor(20 + t * 70);
+          data[idx + 2] = Math.floor(5 + t * 15);
+        } else if (v < 0.78) {
+          const t = (v - 0.42) / 0.36;
+          data[idx] = 255;
+          data[idx + 1] = Math.floor(90 + t * 130);
+          data[idx + 2] = Math.floor(20 + t * 40);
+        } else {
+          const t = (v - 0.78) / 0.22;
+          data[idx] = 255;
+          data[idx + 1] = Math.floor(220 + t * 35);
+          data[idx + 2] = Math.floor(60 + t * 195);
+        }
+        data[idx + 3] = 255;
+      }
+    }
+    ctx.putImageData(imgData, 0, 0);
+    this.lavaTexture.needsUpdate = true;
   }
 
   setupLighting() {
@@ -240,6 +303,15 @@ export class GameRenderer {
     this.checkpointMeshes = [];
     this.spikeMeshes = [];
     this.gemMeshes = [];
+    this.stairMeshes = [];
+    this.fanMeshes = [];
+    this.lavaMeshes = [];
+    this.shieldPickupMeshes = [];
+    this.counterOrbMeshes = [];
+    this.speedGateMeshes = [];
+    if (this.shieldShatterPool) {
+      this.shieldShatterPool.forEach(s => { s.active = false; s.mesh.visible = false; });
+    }
     this.currentLevel = level;
 
     // Clean up previous Inductor Coil elements
@@ -701,35 +773,58 @@ export class GameRenderer {
       this.speedGateMeshes.push(gateGroup);
     }
     else if (type === "shield") {
-      // 🛡️ Collectible 3D Energy Shield Orb
+      // 🛡️ Collectible 3D Energy Shield Orb & Vertical Light Beacon
       const shieldGroup = new THREE.Group();
-      const coreGeo = new THREE.OctahedronGeometry(0.42, 0);
+
+      // Vertical Holy Light Beacon Pillar
+      const beaconGeo = new THREE.CylinderGeometry(0.06, 0.06, 24.0, 8);
+      const beaconMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.28,
+        blending: THREE.AdditiveBlending
+      });
+      const beacon = new THREE.Mesh(beaconGeo, beaconMat);
+      beacon.position.y = 12.0;
+      shieldGroup.add(beacon);
+
+      // Core Octahedron Crystal
+      const coreGeo = new THREE.OctahedronGeometry(0.44, 0);
       const coreMat = new THREE.MeshStandardMaterial({
         color: 0x00f0ff,
-        emissive: 0x00b0ff,
-        emissiveIntensity: 0.8,
-        metalness: 0.9,
+        emissive: 0x00c8ff,
+        emissiveIntensity: 1.2,
+        metalness: 0.95,
         roughness: 0.1
       });
       const core = new THREE.Mesh(coreGeo, coreMat);
       shieldGroup.add(core);
 
       // Outer Pulsing Hexagonal Wire Cage
-      const cageGeo = new THREE.IcosahedronGeometry(0.72, 1);
+      const cageGeo = new THREE.IcosahedronGeometry(0.76, 1);
       const cageMat = new THREE.MeshBasicMaterial({
         color: 0x00ffff,
         wireframe: true,
         transparent: true,
-        opacity: 0.65
+        opacity: 0.75
       });
       const cage = new THREE.Mesh(cageGeo, cageMat);
       shieldGroup.add(cage);
+
+      // Floating Orbiting Gyro Ring
+      const ringGeo = new THREE.TorusGeometry(0.92, 0.035, 8, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0xffd700 });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.rotation.x = Math.PI / 3;
+      shieldGroup.add(ring);
 
       shieldGroup.position.set(x, y, 0);
       shieldGroup.userData = {
         obstacle: obs,
         core: core,
         cage: cage,
+        ring: ring,
+        beacon: beacon,
         isCollected: false
       };
       this.obstaclesGroup.add(shieldGroup);
@@ -777,6 +872,447 @@ export class GameRenderer {
       this.obstaclesGroup.add(turretGroup);
       if (!this.counterOrbMeshes) this.counterOrbMeshes = [];
       this.counterOrbMeshes.push(turretGroup);
+    }
+    else if (type === "stairs") {
+      // 🪜 Premium 3D Multi-Tier Architectural Staircase with LED Light Runners
+      const stairGroup = new THREE.Group();
+      const numSteps = obs.steps || 4;
+      const stepW = obs.stepW || 1.2;
+      const stepH = obs.stepH || 0.5;
+      const dir = obs.dir || "up";
+      const isGothic = (this.currentLevel && this.currentLevel.themeType === 'gothic');
+      const isFairyland = (this.currentLevel && this.currentLevel.themeType === 'fairyland');
+      const isShark = (this.currentLevel && this.currentLevel.themeType === 'shark');
+
+      const stairBaseColor = isGothic ? 0x14081c : (isFairyland ? 0x1a0d28 : (isShark ? 0x071b2c : 0x090f1d));
+      const stairNeonColor = isGothic ? 0xff0055 : (isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9));
+
+      const stepRunners = [];
+      const riserPanels = [];
+
+      for (let i = 0; i < numSteps; i++) {
+        const stepIdx = (dir === "down") ? (numSteps - 1 - i) : i;
+        const currentH = (stepIdx + 1) * stepH;
+        const stepX = x + i * stepW + stepW / 2;
+        const stepY = y + currentH / 2;
+
+        // 1. Step Base Body
+        const stepGeo = new THREE.BoxGeometry(stepW, currentH, 2.4);
+        const stepMat = new THREE.MeshStandardMaterial({
+          color: stairBaseColor,
+          roughness: 0.3,
+          metalness: 0.85
+        });
+        const stepMesh = new THREE.Mesh(stepGeo, stepMat);
+        stepMesh.position.set(stepX, stepY, 0);
+
+        // Edge wireframe
+        const wire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(stepGeo),
+          new THREE.LineBasicMaterial({ color: stairNeonColor, linewidth: 1.5, transparent: true, opacity: 0.85 })
+        );
+        stepMesh.add(wire);
+
+        // 2. Glowing Tread Lip Neon Runner (Top-front edge)
+        const runnerGeo = new THREE.BoxGeometry(stepW * 0.96, 0.08, 0.18);
+        const runnerMat = new THREE.MeshBasicMaterial({ color: stairNeonColor });
+        const runner = new THREE.Mesh(runnerGeo, runnerMat);
+        runner.position.set(0, currentH / 2 + 0.04, 1.15);
+        stepMesh.add(runner);
+        stepRunners.push(runner);
+
+        // 3. Illuminated Riser Panel on vertical face
+        const riserGeo = new THREE.PlaneGeometry(stepW * 0.85, Math.max(0.2, stepH * 0.7));
+        const riserMat = new THREE.MeshBasicMaterial({
+          color: stairNeonColor,
+          transparent: true,
+          opacity: 0.28,
+          side: THREE.DoubleSide
+        });
+        const riser = new THREE.Mesh(riserGeo, riserMat);
+        riser.position.set(0, currentH / 2 - stepH / 2, 1.21);
+        stepMesh.add(riser);
+        riserPanels.push(riser);
+
+        stairGroup.add(stepMesh);
+      }
+
+      stairGroup.userData = {
+        obstacle: obs,
+        runners: stepRunners,
+        risers: riserPanels,
+        neonColor: stairNeonColor,
+        steps: numSteps,
+        stepW: stepW,
+        stepH: stepH,
+        dir: dir,
+        pulseOffset: Math.random() * Math.PI * 2
+      };
+      this.stairMeshes.push(stairGroup);
+      this.obstaclesGroup.add(stairGroup);
+    }
+    else if (type === "fan" || type === "aero_fan") {
+      // 🌪️ High-Tech Aerodynamic Updraft Turbine Rig
+      const fanGroup = new THREE.Group();
+      const fanW = obs.w || 3.2;
+      const fanH = obs.height || 7.5;
+      let fanColor = 0x00f0ff;
+      if (obs.subType === "magma") fanColor = 0xff4500;
+      else if (obs.subType === "emerald") fanColor = 0x00ff88;
+      else if (obs.subType === "amethyst") fanColor = 0xd500f9;
+
+      // 1. Heavy Industrial Hexagonal Turbine Cowling
+      const baseGeo = new THREE.BoxGeometry(fanW, 0.45, 2.6);
+      const baseMat = new THREE.MeshStandardMaterial({
+        color: 0x0c1220,
+        roughness: 0.2,
+        metalness: 0.95
+      });
+      const fanBase = new THREE.Mesh(baseGeo, baseMat);
+      fanBase.position.set(x + fanW / 2, y + 0.22, 0);
+      fanGroup.add(fanBase);
+
+      // Warning hazard wireframe around turbine base
+      const wire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(baseGeo),
+        new THREE.LineBasicMaterial({ color: fanColor, linewidth: 2 })
+      );
+      fanBase.add(wire);
+
+      // Glowing Intake Bevel Rim
+      const rimGeo = new THREE.CylinderGeometry(fanW * 0.42, fanW * 0.45, 0.16, 16);
+      const rimMat = new THREE.MeshBasicMaterial({ color: fanColor });
+      const rim = new THREE.Mesh(rimGeo, rimMat);
+      rim.position.set(0, 0.28, 0);
+      fanBase.add(rim);
+
+      // Protective Intake Grille
+      const grilleGeo = new THREE.PlaneGeometry(fanW * 0.8, 1.8);
+      const grilleMat = new THREE.MeshBasicMaterial({
+        color: fanColor,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.35
+      });
+      const grille = new THREE.Mesh(grilleGeo, grilleMat);
+      grille.rotation.x = -Math.PI / 2;
+      grille.position.set(0, 0.35, 0);
+      fanBase.add(grille);
+
+      // 2. High-Speed Rotating Aerodynamic Rotor Hub & Multi-Blade Propeller
+      const rotorGroup = new THREE.Group();
+      const hubGeo = new THREE.ConeGeometry(0.35, 0.55, 12);
+      const hubMat = new THREE.MeshStandardMaterial({ color: 0xffffff, metalness: 0.95 });
+      const hub = new THREE.Mesh(hubGeo, hubMat);
+      hub.position.y = 0.28;
+      rotorGroup.add(hub);
+
+      // 6 Aerodynamic Curved Fan Blades
+      const bladeGeo = new THREE.BoxGeometry(fanW * 0.38, 0.06, 0.22);
+      const bladeMat = new THREE.MeshStandardMaterial({
+        color: 0x1a2638,
+        emissive: fanColor,
+        emissiveIntensity: 0.25,
+        metalness: 0.9
+      });
+      for (let b = 0; b < 6; b++) {
+        const blade = new THREE.Mesh(bladeGeo, bladeMat);
+        const angle = (b / 6) * Math.PI * 2;
+        blade.rotation.y = angle;
+        blade.rotation.z = 0.25;
+        blade.position.set(Math.cos(angle) * (fanW * 0.2), 0.15, Math.sin(angle) * (fanW * 0.2));
+        rotorGroup.add(blade);
+      }
+      fanBase.add(rotorGroup);
+
+      // 3. Volumetric Updraft Wind Beam Stream
+      const windColGeo = new THREE.CylinderGeometry(fanW * 0.44, fanW * 0.38, fanH, 16, 1, true);
+      const windColMat = new THREE.MeshBasicMaterial({
+        color: fanColor,
+        transparent: true,
+        opacity: 0.12,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const windColumn = new THREE.Mesh(windColGeo, windColMat);
+      windColumn.position.set(x + fanW / 2, y + fanH / 2 + 0.45, 0);
+      fanGroup.add(windColumn);
+
+      // 4. Spiraling Upward Wind Helical Ribbons
+      const ribbons = [];
+      for (let r = 0; r < 3; r++) {
+        const ribGeo = new THREE.TorusGeometry(fanW * 0.36, 0.04, 8, 24, Math.PI * 1.5);
+        const ribMat = new THREE.MeshBasicMaterial({
+          color: fanColor,
+          transparent: true,
+          opacity: 0.65
+        });
+        const rib = new THREE.Mesh(ribGeo, ribMat);
+        rib.rotation.x = Math.PI / 2;
+        rib.userData = { basePhase: (r / 3) * Math.PI * 2, yOffset: (r / 3) * fanH };
+        ribbons.push(rib);
+        fanGroup.add(rib);
+      }
+
+      // 5. Upward Pulsing Gust Rings
+      const gustRings = [];
+      for (let g = 0; g < 4; g++) {
+        const gGeo = new THREE.TorusGeometry(fanW * 0.32, 0.05, 8, 28);
+        const gMat = new THREE.MeshBasicMaterial({
+          color: fanColor,
+          transparent: true,
+          opacity: 0.55
+        });
+        const gRing = new THREE.Mesh(gGeo, gMat);
+        gRing.rotation.x = Math.PI / 2;
+        gRing.userData = { phase: g / 4 };
+        gustRings.push(gRing);
+        fanGroup.add(gRing);
+      }
+
+      fanGroup.userData = {
+        obstacle: obs,
+        rotor: rotorGroup,
+        windColumn: windColumn,
+        ribbons: ribbons,
+        gustRings: gustRings,
+        fanColor: fanColor,
+        fanW: fanW,
+        fanH: fanH,
+        baseX: x + fanW / 2,
+        baseY: y,
+        spinSpeed: 24.0
+      };
+      this.fanMeshes.push(fanGroup);
+      this.obstaclesGroup.add(fanGroup);
+    }
+    else if (type === "lava" || type === "lava_pit") {
+      // 🌋 Dynamic Molten Lava Lake with Churning Magma Canvas & Volcanic Basalt Rocks
+      const lavaGroup = new THREE.Group();
+      const lavaW = obs.w || 8.0;
+      const lavaH = obs.h || 0.8;
+
+      // 1. Heavy Volcanic Basalt Basin
+      const basinGeo = new THREE.BoxGeometry(lavaW + 0.4, 0.35, 3.0);
+      const basinMat = new THREE.MeshStandardMaterial({
+        color: 0x100604,
+        roughness: 0.85,
+        metalness: 0.2
+      });
+      const basin = new THREE.Mesh(basinGeo, basinMat);
+      basin.position.set(x + lavaW / 2, y + 0.12, 0);
+      lavaGroup.add(basin);
+
+      // Glowing Ember Fissure Wireframe around basin edge
+      const basinWire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(basinGeo),
+        new THREE.LineBasicMaterial({ color: 0xff3700, linewidth: 1.5 })
+      );
+      basin.add(basinWire);
+
+      // 2. Molten Liquid Lava Surface Plane with Procedural Animated Magma Texture
+      const lavaGeo = new THREE.PlaneGeometry(lavaW, 2.6, Math.max(4, Math.floor(lavaW)), 4);
+      const lavaMat = new THREE.MeshBasicMaterial({
+        map: this.lavaTexture,
+        side: THREE.DoubleSide
+      });
+      const lavaSurface = new THREE.Mesh(lavaGeo, lavaMat);
+      lavaSurface.rotation.x = -Math.PI / 2;
+      lavaSurface.position.set(x + lavaW / 2, y + lavaH, 0);
+      lavaGroup.add(lavaSurface);
+
+      // 3. Shimmering Atmospheric Heat Haze Layer
+      const hazeGeo = new THREE.PlaneGeometry(lavaW, 2.6);
+      const hazeMat = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.18,
+        depthWrite: false
+      });
+      const haze = new THREE.Mesh(hazeGeo, hazeMat);
+      haze.rotation.x = -Math.PI / 2;
+      haze.position.set(x + lavaW / 2, y + lavaH + 0.12, 0);
+      lavaGroup.add(haze);
+
+      // 4. Floating Volcanic Obsidian Crust Islands
+      const crustCount = Math.max(1, Math.floor(lavaW / 3.5));
+      const crusts = [];
+      for (let c = 0; c < crustCount; c++) {
+        const cGeo = new THREE.BoxGeometry(1.2, 0.14, 1.4);
+        const cMat = new THREE.MeshStandardMaterial({
+          color: 0x180705,
+          roughness: 0.6,
+          metalness: 0.3
+        });
+        const crust = new THREE.Mesh(cGeo, cMat);
+        const cx = x + 1.2 + c * (lavaW / crustCount);
+        crust.position.set(cx, y + lavaH + 0.02, (Math.random() - 0.5) * 0.8);
+        crust.userData = { bobPhase: Math.random() * Math.PI * 2, baseX: cx, baseY: y + lavaH + 0.02 };
+        crusts.push(crust);
+        lavaGroup.add(crust);
+      }
+
+      // 5. Active Magma Bubbles on Surface
+      const bubbleCount = Math.max(2, Math.floor(lavaW / 2.5));
+      const bubbles = [];
+      for (let b = 0; b < bubbleCount; b++) {
+        const bGeo = new THREE.SphereGeometry(0.24, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
+        const bMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+        const bubble = new THREE.Mesh(bGeo, bMat);
+        const bx = x + 0.8 + b * (lavaW / bubbleCount) + (Math.random() - 0.5) * 0.6;
+        bubble.position.set(bx, y + lavaH, (Math.random() - 0.5) * 1.2);
+        bubble.userData = {
+          phase: Math.random() * Math.PI * 2,
+          speed: Math.random() * 2.5 + 2.0,
+          maxScale: Math.random() * 0.6 + 0.8
+        };
+        bubbles.push(bubble);
+        lavaGroup.add(bubble);
+      }
+
+      lavaGroup.userData = {
+        obstacle: obs,
+        surface: lavaSurface,
+        haze: haze,
+        crusts: crusts,
+        bubbles: bubbles,
+        lavaW: lavaW,
+        lavaH: lavaH
+      };
+      this.lavaMeshes.push(lavaGroup);
+      this.obstaclesGroup.add(lavaGroup);
+    }
+    else if (type === "lava_bubble") {
+      // 🌋 Active Magma Bubble Hazard Block
+      const bubbleGroup = new THREE.Group();
+      const bw = obs.w || 2.2;
+      const bh = obs.h || 1.4;
+
+      const bGeo = new THREE.BoxGeometry(bw, bh, 2.2);
+      const bMat = new THREE.MeshStandardMaterial({
+        color: 0x140502,
+        roughness: 0.75,
+        metalness: 0.3
+      });
+      const rock = new THREE.Mesh(bGeo, bMat);
+      rock.position.set(x + bw / 2, y + bh / 2, 0);
+      bubbleGroup.add(rock);
+
+      const rockWire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(bGeo),
+        new THREE.LineBasicMaterial({ color: 0xff4500, linewidth: 2 })
+      );
+      rock.add(rockWire);
+
+      const bubbles = [];
+      for (let b = 0; b < 2; b++) {
+        const domeGeo = new THREE.SphereGeometry(0.38, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
+        const domeMat = new THREE.MeshBasicMaterial({ color: 0xffa500 });
+        const dome = new THREE.Mesh(domeGeo, domeMat);
+        const bOff = (b === 0 ? -0.45 : 0.45);
+        dome.position.set(bOff, bh / 2, 0);
+        dome.userData = {
+          phase: b * Math.PI,
+          speed: 3.2
+        };
+        rock.add(dome);
+        bubbles.push(dome);
+      }
+
+      bubbleGroup.userData = {
+        obstacle: obs,
+        bubbles: bubbles
+      };
+      this.lavaMeshes.push(bubbleGroup);
+      this.obstaclesGroup.add(bubbleGroup);
+    }
+    else if (type === "lava_crust") {
+      // 🌋 Floating Volcanic Basalt Stepping Platform (Safe on top!)
+      const crustGroup = new THREE.Group();
+      const cw = obs.w || 3.0;
+      const ch = obs.h || 1.2;
+
+      const cGeo = new THREE.BoxGeometry(cw, ch, 2.4);
+      const cMat = new THREE.MeshStandardMaterial({
+        color: 0x160806,
+        roughness: 0.55,
+        metalness: 0.5
+      });
+      const crustBlock = new THREE.Mesh(cGeo, cMat);
+      crustBlock.position.set(x + cw / 2, y + ch / 2, 0);
+      crustGroup.add(crustBlock);
+
+      const cWire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(cGeo),
+        new THREE.LineBasicMaterial({ color: 0xff3700, linewidth: 2 })
+      );
+      crustBlock.add(cWire);
+
+      const inlayGeo = new THREE.PlaneGeometry(cw * 0.85, ch * 0.6);
+      const inlayMat = new THREE.MeshBasicMaterial({
+        color: 0xff4500,
+        transparent: true,
+        opacity: 0.35,
+        side: THREE.DoubleSide
+      });
+      const inlay = new THREE.Mesh(inlayGeo, inlayMat);
+      inlay.position.set(0, 0, 1.21);
+      crustBlock.add(inlay);
+
+      crustGroup.userData = { obstacle: obs };
+      this.lavaMeshes.push(crustGroup);
+      this.obstaclesGroup.add(crustGroup);
+    }
+    else if (type === "lava_crystal") {
+      // 🌋 Crimson Volcanic Obsidian Spike with Molten Core
+      const crystalGroup = new THREE.Group();
+      const height = 1.1;
+      const radius = 0.52;
+
+      const baseGeo = new THREE.CylinderGeometry(radius * 1.2, radius * 1.3, 0.12, 6);
+      const baseMat = new THREE.MeshStandardMaterial({ color: 0x1a0604, roughness: 0.4, metalness: 0.8 });
+      const basePlate = new THREE.Mesh(baseGeo, baseMat);
+      basePlate.position.y = 0.06;
+      crystalGroup.add(basePlate);
+
+      const coneGeo = new THREE.ConeGeometry(radius, height, 8);
+      const coneMat = new THREE.MeshStandardMaterial({
+        color: 0x100302,
+        roughness: 0.1,
+        metalness: 0.95,
+        flatShading: true
+      });
+      const cone = new THREE.Mesh(coneGeo, coneMat);
+      cone.position.y = 0.12 + height / 2;
+      crystalGroup.add(cone);
+
+      const wire = new THREE.LineSegments(
+        new THREE.EdgesGeometry(coneGeo),
+        new THREE.LineBasicMaterial({ color: 0xff3700, linewidth: 2.5 })
+      );
+      cone.add(wire);
+
+      const coreGeo = new THREE.OctahedronGeometry(0.2, 0);
+      const coreMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.y = 0.45;
+      crystalGroup.add(core);
+
+      if (obs.dir === "down") {
+        crystalGroup.rotation.z = Math.PI;
+        crystalGroup.position.set(x, y, 0);
+      } else {
+        crystalGroup.position.set(x, y, 0);
+      }
+
+      crystalGroup.userData = {
+        obstacle: obs,
+        core: core,
+        wireColor: 0xff3700,
+        pulseOffset: Math.random() * Math.PI * 2
+      };
+      this.spikeMeshes.push(crystalGroup);
+      this.obstaclesGroup.add(crystalGroup);
     }
   }
 
@@ -1592,15 +2128,17 @@ export class GameRenderer {
     this.ufoMesh.visible = false;
     this.playerGroup.add(this.ufoMesh);
 
-    // ── 5. HEXAGONAL ENERGY SHIELD BARRIER (COLLECTIBLE BUFF) ──
+    // ── 5. HEXAGONAL MULTI-TIER ENERGY SHIELD BARRIER (COLLECTIBLE BUFF) ──
     const shieldGroup = new THREE.Group();
-    const shieldGeo = new THREE.IcosahedronGeometry(1.08, 1);
+    const shieldGeo = new THREE.IcosahedronGeometry(1.12, 1);
     const shieldMat = new THREE.MeshStandardMaterial({
       color: 0x00f0ff,
-      roughness: 0.2,
-      metalness: 0.9,
+      emissive: 0x0066aa,
+      emissiveIntensity: 0.6,
+      roughness: 0.15,
+      metalness: 0.95,
       transparent: true,
-      opacity: 0.35,
+      opacity: 0.38,
       side: THREE.DoubleSide
     });
     const shieldSphere = new THREE.Mesh(shieldGeo, shieldMat);
@@ -1611,7 +2149,51 @@ export class GameRenderer {
     const shieldWire = new THREE.LineSegments(shieldWireGeo, shieldWireMat);
     shieldGroup.add(shieldWire);
 
+    // Dual Counter-Rotating Gyroscopic Deflector Rings with Quantum Satellite Nodes
+    const ring1Geo = new THREE.TorusGeometry(1.24, 0.04, 8, 36);
+    const ring1Mat = new THREE.MeshBasicMaterial({ color: 0x00f0ff });
+    const ring1 = new THREE.Mesh(ring1Geo, ring1Mat);
+    ring1.rotation.x = Math.PI / 3;
+    shieldGroup.add(ring1);
+
+    const ring2Geo = new THREE.TorusGeometry(1.30, 0.035, 8, 36);
+    const ring2Mat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const ring2 = new THREE.Mesh(ring2Geo, ring2Mat);
+    ring2.rotation.y = Math.PI / 3;
+    shieldGroup.add(ring2);
+
+    // 4 Orbiting Satellite Nodes on Ring 1
+    for (let r = 0; r < 4; r++) {
+      const nodeGeo = new THREE.OctahedronGeometry(0.12, 0);
+      const nodeMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+      const node = new THREE.Mesh(nodeGeo, nodeMat);
+      const angle = (r / 4) * Math.PI * 2;
+      node.position.set(Math.cos(angle) * 1.24, Math.sin(angle) * 1.24, 0);
+      ring1.add(node);
+    }
+
+    // Inner Pulsing Hyper-Plasma Core
+    const innerPlasmaGeo = new THREE.OctahedronGeometry(0.48, 0);
+    const innerPlasmaMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
+    const innerPlasma = new THREE.Mesh(innerPlasmaGeo, innerPlasmaMat);
+    shieldGroup.add(innerPlasma);
+
+    // Dedicated Invulnerability Holographic Hex Cage
+    const invulnCageGeo = new THREE.DodecahedronGeometry(1.28, 0);
+    const invulnCageMat = new THREE.LineBasicMaterial({ color: 0x00ffff, linewidth: 3 });
+    const invulnCage = new THREE.LineSegments(new THREE.WireframeGeometry(invulnCageGeo), invulnCageMat);
+    invulnCage.visible = false;
+    shieldGroup.add(invulnCage);
+
     this.shieldMesh = shieldGroup;
+    this.shieldMesh.userData = {
+      sphere: shieldSphere,
+      wire: shieldWire,
+      ring1: ring1,
+      ring2: ring2,
+      innerPlasma: innerPlasma,
+      invulnCage: invulnCage
+    };
     this.shieldMesh.visible = false;
     this.playerGroup.add(this.shieldMesh);
 
@@ -1808,6 +2390,90 @@ export class GameRenderer {
       return;
     }
 
+    if (expr === 'shield_active' || expr === 'invincible') {
+      // 🛡️ High-Tech Shield/Invincible Mode: Hexagonal HUD Eyes with Crosshairs
+      ctx.strokeStyle = "#00f0ff";
+      ctx.fillStyle = "rgba(0, 240, 255, 0.25)";
+      ctx.lineWidth = 4;
+
+      const drawHexEye = (cx, cy) => {
+        ctx.beginPath();
+        for (let a = 0; a < 6; a++) {
+          const angle = (a / 6) * Math.PI * 2;
+          const x = cx + Math.cos(angle) * 22;
+          const y = cy + Math.sin(angle) * 22;
+          if (a === 0) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.fill();
+        ctx.stroke();
+
+        // Crosshairs
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cx - 14, cy); ctx.lineTo(cx + 14, cy);
+        ctx.moveTo(cx, cy - 14); ctx.lineTo(cx, cy + 14);
+        ctx.stroke();
+      };
+      drawHexEye(76, 114);
+      drawHexEye(180, 114);
+
+      // Confident cyber smirk
+      ctx.strokeStyle = "#00ffff";
+      ctx.lineWidth = 5;
+      ctx.beginPath();
+      ctx.moveTo(96, 172);
+      ctx.lineTo(136, 178);
+      ctx.lineTo(164, 168);
+      ctx.stroke();
+      return;
+    }
+
+    if (expr === 'hyperspeed') {
+      // ⚡ Aerodynamic Supersonic Visor Slits
+      ctx.fillStyle = "#ffd700";
+      ctx.beginPath();
+      ctx.moveTo(56, 110); ctx.lineTo(108, 98); ctx.lineTo(100, 126); ctx.lineTo(48, 126);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.moveTo(148, 98); ctx.lineTo(200, 110); ctx.lineTo(208, 126); ctx.lineTo(156, 126);
+      ctx.fill();
+
+      // Determined grimace / grinning teeth
+      ctx.strokeStyle = "#ffd700";
+      ctx.lineWidth = 4;
+      ctx.strokeRect(92, 164, 72, 16);
+      ctx.beginPath();
+      ctx.moveTo(116, 164); ctx.lineTo(116, 180);
+      ctx.moveTo(140, 164); ctx.lineTo(140, 180);
+      ctx.stroke();
+      return;
+    }
+
+    if (expr === 'near_miss') {
+      // ⚠ Startled Near-Miss Eyes: Wide Pupils with Jitter
+      ctx.fillStyle = "#ff5500";
+      ctx.beginPath();
+      ctx.arc(76, 112, 26, 0, Math.PI * 2);
+      ctx.arc(180, 112, 26, 0, Math.PI * 2);
+      ctx.fill();
+
+      ctx.fillStyle = "#ffffff";
+      ctx.beginPath();
+      ctx.arc(76 + (Math.random() - 0.5) * 4, 112, 10, 0, Math.PI * 2);
+      ctx.arc(180 + (Math.random() - 0.5) * 4, 112, 10, 0, Math.PI * 2);
+      ctx.fill();
+
+      // Gasping mouth
+      ctx.fillStyle = "#ff2200";
+      ctx.beginPath();
+      ctx.ellipse(128, 174, 18, 24, 0, 0, Math.PI * 2);
+      ctx.fill();
+      return;
+    }
+
     if (expr === 'jump' || !isGrounded) {
       // Excited wide-open eyes with bright sparkle
       eyeH = 58;
@@ -1930,6 +2596,15 @@ export class GameRenderer {
 
     // 3. ⚡ Induction Coil Warp Plasma Particle Pool
     this.setupInductionPlasma();
+
+    // 4. 🛡️ 3D Hexagonal Energy Shield Shatter Crystal Shards Pool
+    this.setupShieldShatterPool();
+
+    // 5. 🚀 Hypersonic Warp Speed Streaks Tunnel System
+    this.setupWarpSpeedStreaks();
+
+    // 6. ✨ Colossal Volumetric God Rays & Atmospheric Light Beams
+    this.setupVolumetricGodRays();
   }
 
   setupInductionPlasma() {
@@ -1950,6 +2625,105 @@ export class GameRenderer {
     this.plasmaStreamParticles = [];
     for (let i = 0; i < plCount; i++) {
       this.plasmaStreamParticles.push({ x: 0, y: -999, z: 0, vx: 0, vy: 0, vz: 0, life: 0, maxLife: 0.35 });
+    }
+  }
+
+  // 🛡️ 3D Hexagonal Energy Shield Shatter Crystal Shards Pool
+  setupShieldShatterPool() {
+    const shardCount = 32;
+    this.shieldShatterPool = [];
+    this.shieldShatterGroup = new THREE.Group();
+    this.scene.add(this.shieldShatterGroup);
+
+    for (let i = 0; i < shardCount; i++) {
+      const geo = (i % 2 === 0)
+        ? new THREE.ConeGeometry(0.18 + Math.random() * 0.12, 0.38 + Math.random() * 0.2, 3)
+        : new THREE.CylinderGeometry(0.16, 0.22, 0.05, 6);
+      const mat = new THREE.MeshStandardMaterial({
+        color: (i % 3 === 0 ? 0x00ffff : (i % 3 === 1 ? 0xffffff : 0x00f0ff)),
+        emissive: 0x00aaff,
+        emissiveIntensity: 1.4,
+        roughness: 0.12,
+        metalness: 0.92,
+        transparent: true,
+        opacity: 0.95
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.visible = false;
+      this.shieldShatterGroup.add(mesh);
+      this.shieldShatterPool.push({
+        mesh: mesh,
+        active: false,
+        vx: 0,
+        vy: 0,
+        vz: 0,
+        rx: 0,
+        ry: 0,
+        rz: 0,
+        life: 0,
+        maxLife: 0.85
+      });
+    }
+  }
+
+  // 🚀 Hypersonic Warp Speed Streaks Tunnel System
+  setupWarpSpeedStreaks() {
+    const streakCount = 64;
+    this.warpStreaksGroup = new THREE.Group();
+    this.scene.add(this.warpStreaksGroup);
+    this.warpStreaks = [];
+
+    const streakGeo = new THREE.CylinderGeometry(0.024, 0.024, 4.5, 4);
+    streakGeo.rotateZ(Math.PI / 2);
+
+    for (let i = 0; i < streakCount; i++) {
+      const isCyan = (i % 2 === 0);
+      const mat = new THREE.MeshBasicMaterial({
+        color: isCyan ? 0x00f0ff : 0xd500f9,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending
+      });
+      const mesh = new THREE.Mesh(streakGeo, mat);
+      mesh.position.set(0, -999, 0);
+      this.warpStreaksGroup.add(mesh);
+      this.warpStreaks.push({
+        mesh: mesh,
+        relX: Math.random() * 45 - 10,
+        relY: Math.random() * 12 - 2,
+        relZ: (Math.random() - 0.5) * 8,
+        speedBonus: Math.random() * 14 + 16
+      });
+    }
+  }
+
+  // ✨ Colossal Volumetric God Rays & Atmospheric Light Beams
+  setupVolumetricGodRays() {
+    this.godRaysGroup = new THREE.Group();
+    this.scene.add(this.godRaysGroup);
+    this.godRays = [];
+
+    const beamCount = 6;
+    for (let i = 0; i < beamCount; i++) {
+      const beamGeo = new THREE.PlaneGeometry(6.5 + (i % 3) * 2.0, 36.0);
+      const beamMat = new THREE.MeshBasicMaterial({
+        color: 0x00f0ff,
+        transparent: true,
+        opacity: 0.07,
+        blending: THREE.AdditiveBlending,
+        side: THREE.DoubleSide,
+        depthWrite: false
+      });
+      const mesh = new THREE.Mesh(beamGeo, beamMat);
+      mesh.rotation.z = -Math.PI / 3.8;
+      mesh.position.set(i * 32, 14, -8 - (i % 3) * 3);
+      this.godRaysGroup.add(mesh);
+      this.godRays.push({
+        mesh: mesh,
+        baseX: i * 32,
+        phase: i * 1.4,
+        baseOpacity: 0.065 + (i % 3) * 0.02
+      });
     }
   }
 
@@ -1981,6 +2755,50 @@ export class GameRenderer {
       sw.maxScale = maxScale;
       sw.life = 0.35;
       sw.maxLife = 0.35;
+    }
+  }
+
+  // ⚡ High-Performance Screen Flash Overlay & WebGL Lighting Flare
+  triggerScreenFlash(duration = 0.35, colorHex = 0xffffff) {
+    const flashEl = document.getElementById('screen-flash');
+    if (flashEl) {
+      flashEl.classList.add('flash-active');
+      setTimeout(() => {
+        if (flashEl) flashEl.classList.remove('flash-active');
+      }, Math.max(60, duration * 1000));
+    }
+    // WebGL Direct Lighting Flare Surge
+    if (this.dirLight) {
+      const origIntensity = this.dirLight.intensity;
+      this.dirLight.intensity = origIntensity + 2.8;
+      setTimeout(() => {
+        if (this.dirLight) this.dirLight.intensity = origIntensity;
+      }, Math.max(50, duration * 450));
+    }
+    this.cameraTrauma = Math.min(1.0, this.cameraTrauma + 0.32);
+  }
+
+  // 🛡️ 3D Hexagonal Energy Shield Shatter Burst
+  triggerShieldShatter(x, y) {
+    if (!this.shieldShatterPool) return;
+    const count = 18;
+    for (let i = 0; i < count; i++) {
+      const s = this.shieldShatterPool.find(item => !item.active);
+      if (s) {
+        s.active = true;
+        s.mesh.visible = true;
+        s.mesh.position.set(x, y, (Math.random() - 0.5) * 0.8);
+        s.mesh.scale.set(1, 1, 1);
+        s.mesh.material.opacity = 0.95;
+        s.vx = (Math.random() - 0.5) * 18.0;
+        s.vy = Math.random() * 12.0 + 4.0;
+        s.vz = (Math.random() - 0.5) * 12.0;
+        s.rx = (Math.random() - 0.5) * 25.0;
+        s.ry = (Math.random() - 0.5) * 25.0;
+        s.rz = (Math.random() - 0.5) * 25.0;
+        s.life = 0.85;
+        s.maxLife = 0.85;
+      }
     }
   }
 
@@ -2044,6 +2862,37 @@ export class GameRenderer {
       );
       p.rotVel.set(Math.random() * 15, Math.random() * 15, Math.random() * 15);
       p.life = 0.55;
+    });
+  }
+
+  // 🌋 Fiery Volcanic Magma Incineration Death
+  triggerLavaDeath(pos) {
+    this.isExploding = true;
+    this.cameraTrauma = 1.0;
+
+    this.triggerShockwave(pos.x, pos.y, 0xff3700, 5.0);
+    this.triggerScreenFlash(0.35);
+
+    this.voxelPieces.forEach((p, idx) => {
+      p.mesh.visible = true;
+      p.pos.copy(pos);
+      p.mesh.position.copy(pos);
+
+      // Saturated glowing magma colors
+      const lavaColor = idx % 3 === 0 ? "#FFDD00" : (idx % 3 === 1 ? "#FF5500" : "#FF1100");
+      p.mesh.material.color.set(lavaColor);
+      p.mesh.material.emissive.set(lavaColor);
+
+      // Upward thermal plume ejection
+      const angle = (Math.random() - 0.5) * Math.PI * 0.8;
+      const speed = Math.random() * 16 + 10;
+      p.vel.set(
+        Math.sin(angle) * speed,
+        Math.cos(angle) * speed + 7,
+        (Math.random() - 0.5) * 4
+      );
+      p.rotVel.set(Math.random() * 22, Math.random() * 22, Math.random() * 22);
+      p.life = 0.65;
     });
   }
 
@@ -2372,14 +3221,47 @@ export class GameRenderer {
         }
       }
 
-      // Energy Shield Barrier Animation
+      // 🛡️ Multi-Tier Energy Shield Barrier & Invulnerability Grace Period Animation
+      const hasShield = !!playerState.hasShield;
+      const invulnTimer = playerState.invulnerableTimer || 0;
+      const isInvulnerable = (invulnTimer > 0);
+
       if (this.shieldMesh) {
-        this.shieldMesh.visible = !!playerState.hasShield;
-        if (playerState.hasShield) {
-          this.shieldMesh.rotation.y += dt * 3.0;
-          this.shieldMesh.rotation.x += dt * 1.6;
+        this.shieldMesh.visible = (hasShield || isInvulnerable);
+        const u = this.shieldMesh.userData;
+
+        if (hasShield) {
+          this.shieldMesh.rotation.y += dt * 3.4;
+          this.shieldMesh.rotation.x += dt * 1.8;
+          if (u.ring1) u.ring1.rotation.z += dt * 5.2;
+          if (u.ring2) u.ring2.rotation.y += dt * 4.4;
+          if (u.innerPlasma) {
+            u.innerPlasma.rotation.x += dt * 6.5;
+            const pScale = 0.88 + Math.sin(time * 10) * 0.16;
+            u.innerPlasma.scale.set(pScale, pScale, pScale);
+          }
+          if (u.invulnCage) u.invulnCage.visible = false;
+          if (u.sphere) u.sphere.visible = true;
           const s = 1.0 + Math.sin(time * 8) * 0.08;
           this.shieldMesh.scale.set(s, s, s);
+        } else if (isInvulnerable) {
+          // Rapid Invulnerability Honeycomb Pulse & Phase Shift
+          if (u.invulnCage) {
+            u.invulnCage.visible = true;
+            u.invulnCage.rotation.y += dt * 14.0;
+            u.invulnCage.rotation.z += dt * 9.0;
+            const flashWhite = (Math.floor(time * 30) % 2 === 0);
+            u.invulnCage.material.color.setHex(flashWhite ? 0xffffff : 0x00ffff);
+          }
+          if (u.sphere) u.sphere.visible = (Math.floor(time * 20) % 2 === 0);
+          this.shieldMesh.scale.set(1.15, 1.15, 1.15);
+
+          // Visually flicker player model at 24Hz to indicate active grace invulnerability
+          const flickerVisible = (Math.floor(time * 24) % 2 === 0);
+          if (vehicleMode === "cube" && this.cubeMesh) this.cubeMesh.visible = flickerVisible;
+          else if (vehicleMode === "ship" && this.shipMesh) this.shipMesh.visible = flickerVisible;
+          else if (vehicleMode === "wave" && this.waveMesh) this.waveMesh.visible = flickerVisible;
+          else if (vehicleMode === "ufo" && this.ufoMesh) this.ufoMesh.visible = flickerVisible;
         }
       }
     } else {
@@ -2428,7 +3310,20 @@ export class GameRenderer {
       this.camera.position.y += (targetCameraY - this.camera.position.y) * Math.min(1, 8.5 * dt) + camShakeY;
       this.camera.position.z = 15.5;
       this.camera.lookAt(x + 5.5, this.camera.position.y * 0.85 + 0.5, 0);
+
+      // ⚡ Dynamic Hypersonic Speed Warp FOV Stretching
+      const speedMult = playerState.speedMult || 1.0;
+      const targetFov = this.defaultCameraFov + Math.max(0, (speedMult - 1.0) * 11.0);
+      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, 5.0 * dt);
+      this.camera.updateProjectionMatrix();
     }
+
+    // 🚀 Update Hypersonic Warp Speed Streaks Tunnel System
+    const currentSpeedMult = playerState.speedMult || 1.0;
+    this.updateWarpSpeedStreaks(dt, currentSpeedMult, x, y);
+
+    // ✨ Update Volumetric God Rays Light Shafts
+    this.updateVolumetricGodRays(time, dt);
 
     // 8. Update Parallax Scenery Engine (Dynamic Obstacle Zones & Themed Backdrop)
     if (this.sceneryManager) {
@@ -2532,10 +3427,18 @@ export class GameRenderer {
     if (this.shieldPickupMeshes) {
       this.shieldPickupMeshes.forEach(sp => {
         if (!sp.userData.isCollected) {
-          sp.userData.core.rotation.y += dt * 3.2;
+          sp.userData.core.rotation.y += dt * 3.4;
           sp.userData.cage.rotation.y -= dt * 2.2;
           sp.userData.cage.rotation.x += dt * 1.6;
-          sp.position.y = sp.userData.obstacle.y + Math.sin(time * 3.5 + sp.position.x) * 0.14;
+          if (sp.userData.ring) {
+            sp.userData.ring.rotation.z += dt * 4.0;
+            sp.userData.ring.rotation.x += dt * 2.5;
+          }
+          if (sp.userData.beacon) {
+            sp.userData.beacon.material.opacity = 0.22 + Math.sin(time * 6.0 + sp.position.x) * 0.12;
+          }
+          const baseY = (sp.userData.obstacle && sp.userData.obstacle.y !== undefined) ? sp.userData.obstacle.y : 2.5;
+          sp.position.y = baseY + Math.sin(time * 3.5 + sp.position.x) * 0.18;
         }
       });
     }
@@ -2549,6 +3452,93 @@ export class GameRenderer {
           co.userData.pulseVal -= dt * 4.0;
           const s = 1.0 + Math.max(0, co.userData.pulseVal) * 0.4;
           co.scale.set(s, s, s);
+        }
+      });
+    }
+
+    // 10d. 🪜 Animated Stairs Sequential LED Light Runners
+    this.stairMeshes.forEach(stair => {
+      const u = stair.userData;
+      if (u.runners && u.runners.length > 0) {
+        const stepCount = u.steps;
+        const currentRunnerIdx = Math.floor((time * 6.5 + u.pulseOffset) % stepCount);
+        u.runners.forEach((r, idx) => {
+          if (idx === currentRunnerIdx) {
+            r.material.color.setHex(0xffffff);
+            r.scale.set(1.05, 1.4, 1.2);
+          } else {
+            r.material.color.setHex(u.neonColor);
+            r.scale.set(1.0, 1.0, 1.0);
+          }
+        });
+      }
+      if (u.risers) {
+        const pulse = 0.22 + Math.sin(time * 4.0 + u.pulseOffset) * 0.12;
+        u.risers.forEach(riser => {
+          riser.material.opacity = pulse;
+        });
+      }
+    });
+
+    // 10e. 🌪️ Aero Fan Rotors, Spiraling Wind Ribbons & Gust Rings
+    this.fanMeshes.forEach(fan => {
+      const u = fan.userData;
+      const playerInFan = isAlive && (x >= u.obstacle.x - 0.2 && x <= u.obstacle.x + u.fanW + 0.2 && y >= u.baseY - 0.2 && y <= u.baseY + u.fanH);
+      const rotorSpeed = playerInFan ? 65.0 : u.spinSpeed;
+      if (u.rotor) {
+        u.rotor.rotation.y += dt * rotorSpeed;
+      }
+      if (u.windColumn) {
+        u.windColumn.material.opacity = playerInFan ? 0.28 : 0.12;
+        const colPulse = 1.0 + Math.sin(time * 12) * 0.04;
+        u.windColumn.scale.set(colPulse, 1.0, colPulse);
+      }
+      if (u.ribbons) {
+        u.ribbons.forEach(rib => {
+          rib.rotation.z += dt * (playerInFan ? 7.0 : 3.5);
+          rib.position.x = u.baseX;
+          const yDrift = ((time * (playerInFan ? 4.5 : 2.5) + rib.userData.yOffset) % u.fanH);
+          rib.position.y = u.baseY + 0.5 + yDrift;
+          rib.material.opacity = Math.sin((yDrift / u.fanH) * Math.PI) * 0.75;
+        });
+      }
+      if (u.gustRings) {
+        u.gustRings.forEach(gRing => {
+          const gProg = ((time * (playerInFan ? 3.5 : 2.0) + gRing.userData.phase) % 1.0);
+          gRing.position.set(u.baseX, u.baseY + 0.4 + gProg * u.fanH, 0);
+          const s = 1.0 + gProg * 0.45;
+          gRing.scale.set(s, s, 1.0);
+          gRing.material.opacity = (1.0 - gProg) * 0.65;
+        });
+      }
+    });
+
+    // 10f. 🌋 Molten Lava Churning Magma Canvas & Active Magma Bubbles
+    if (this.lavaMeshes.length > 0) {
+      if (!this.lastLavaTextureTime || (performance.now() - this.lastLavaTextureTime > 35)) {
+        this.lastLavaTextureTime = performance.now();
+        this.updateLavaTexture(time);
+      }
+      this.lavaMeshes.forEach(lava => {
+        const u = lava.userData;
+        if (u.crusts) {
+          u.crusts.forEach(crust => {
+            crust.position.y = crust.userData.baseY + Math.sin(time * 3.2 + crust.userData.bobPhase) * 0.04;
+            crust.rotation.z = Math.sin(time * 2.5 + crust.userData.bobPhase) * 0.02;
+          });
+        }
+        if (u.bubbles) {
+          u.bubbles.forEach(bubble => {
+            const bProg = (time * (bubble.userData.speed || 3.0) + bubble.userData.phase) % (Math.PI * 2);
+            const scale = Math.max(0.01, Math.sin(bProg) * (bubble.userData.maxScale || 1.0));
+            bubble.scale.set(scale, scale * 1.25, scale);
+            if (scale > 0.85 && Math.random() < 0.25) {
+              this.emitSparkParticle(bubble.position.x, bubble.position.y + 0.2);
+            }
+          });
+        }
+        if (u.haze) {
+          u.haze.material.opacity = 0.16 + Math.sin(time * 5.0) * 0.08;
         }
       });
     }
@@ -2660,6 +3650,66 @@ export class GameRenderer {
       });
       this.plasmaPoints.geometry.attributes.position.needsUpdate = true;
     }
+
+    // 🛡️ 3D Hexagonal Energy Shield Shatter Physics Shards
+    this.updateShieldShatter(dt);
+  }
+
+  // 🛡️ Update Shatter Crystal Fragments
+  updateShieldShatter(dt) {
+    if (!this.shieldShatterPool) return;
+    this.shieldShatterPool.forEach(s => {
+      if (s.active) {
+        s.life -= dt;
+        if (s.life <= 0) {
+          s.active = false;
+          s.mesh.visible = false;
+        } else {
+          s.mesh.position.x += s.vx * dt;
+          s.mesh.position.y += s.vy * dt;
+          s.mesh.position.z += s.vz * dt;
+          s.vy -= 28.0 * dt;
+          s.mesh.rotation.x += s.rx * dt;
+          s.mesh.rotation.y += s.ry * dt;
+          s.mesh.rotation.z += s.rz * dt;
+          const fade = Math.max(0, s.life / s.maxLife);
+          s.mesh.scale.set(fade, fade, fade);
+          if (s.mesh.material) s.mesh.material.opacity = fade * 0.95;
+        }
+      }
+    });
+  }
+
+  // 🚀 Update Warp Speed Streaks
+  updateWarpSpeedStreaks(dt, speedMult, playerX, playerY) {
+    if (!this.warpStreaks || !this.warpStreaksGroup) return;
+    const isWarping = (speedMult > 1.05);
+    const targetOpacity = isWarping ? Math.min(0.85, (speedMult - 1.0) * 0.7) : 0.0;
+
+    this.warpStreaks.forEach((item) => {
+      const m = item.mesh;
+      m.material.opacity += (targetOpacity - m.material.opacity) * Math.min(1, 8.0 * dt);
+      if (m.material.opacity > 0.01) {
+        m.position.x -= (34.0 * speedMult + item.speedBonus) * dt;
+        if (m.position.x < playerX - 14) {
+          m.position.x = playerX + 32 + Math.random() * 12;
+          m.position.y = (playerY || 4.5) + (Math.random() - 0.5) * 10;
+          m.position.z = (Math.random() - 0.5) * 7.5;
+        }
+      }
+    });
+  }
+
+  // ✨ Update Volumetric God Rays
+  updateVolumetricGodRays(time, dt) {
+    if (!this.godRays) return;
+    const beatPulse = (this.underglow && this.underglow.intensity > 3.0) ? 0.08 : 0.0;
+    this.godRays.forEach(ray => {
+      const wobble = Math.sin(time * 1.5 + ray.phase) * 0.04;
+      ray.mesh.rotation.z = -Math.PI / 3.8 + wobble;
+      const targetOp = ray.baseOpacity + Math.sin(time * 2.2 + ray.phase) * 0.02 + beatPulse;
+      ray.mesh.material.opacity += (targetOp - ray.mesh.material.opacity) * Math.min(1, 6.0 * dt);
+    });
   }
 
   updateShockwaves(dt) {

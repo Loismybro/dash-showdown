@@ -44,6 +44,24 @@ class GameManager {
     this.bestScores = [0, 0, 0, 0, 0];
     this.loadBestScores();
 
+    // 🏆 Dynamic "Devil May Cry / ULTRAKILL" Rhythm Style & Combo Ranking Engine
+    this.styleSystem = {
+      score: 0,
+      combo: 0,
+      multiplier: 1.0,
+      decayTimer: 0,
+      rankIdx: 0,
+      ranks: [
+        { letter: 'D', label: 'DOPE', color: '#cd7f32', minScore: 0 },
+        { letter: 'C', label: 'CRAZY', color: '#c0c0c0', minScore: 600 },
+        { letter: 'B', label: 'BADASS', color: '#ffd700', minScore: 1500 },
+        { letter: 'A', label: 'APOCALYPSE', color: '#00ff88', minScore: 2800 },
+        { letter: 'S', label: 'SAVAGE', color: '#ff0055', minScore: 4500 },
+        { letter: 'SS', label: 'SICK SKILLS', color: '#00f0ff', minScore: 6500 },
+        { letter: 'SSS', label: 'GODLIKE', color: '#ff00ff', minScore: 9000 }
+      ]
+    };
+
     // Gem Collection System
     this.gemsCollected = new Set();
     this.totalLevelGems = 0;
@@ -382,12 +400,28 @@ class GameManager {
       this.player.gravityDir = cp.gravityDir || 1;
       this.player.isGrounded = false;
       this.player.isAlive = true;
-      this.player.orbTriggered = new Set(cp.orbTriggered || []);
-      if (cp.gems) {
-        this.gemsCollected = new Set(cp.gems);
-      } else {
-        this.gemsCollected.clear();
+      this.player.hasShield = !!cp.hasShield;
+      this.player.invulnerableTimer = 0;
+      const shieldInd = document.getElementById('player-shield-indicator');
+      if (shieldInd) shieldInd.style.display = this.player.hasShield ? 'block' : 'none';
+
+      // Restore shield pickups based on checkpoint location
+      if (this.level && this.level.obstacles) {
+        this.level.obstacles.forEach(o => {
+          if (o.type === 'shield') {
+            o.collected = (o.x < cp.x && cp.hasShield);
+          }
+        });
+        if (this.renderer && this.renderer.shieldPickupMeshes) {
+          this.renderer.shieldPickupMeshes.forEach(sp => {
+            const obs = sp.userData.obstacle;
+            const collected = obs ? !!obs.collected : false;
+            sp.userData.isCollected = collected;
+            sp.visible = !collected;
+          });
+        }
       }
+
       this.updateGemHUD();
       if (this.renderer && this.renderer.resetGems) {
         this.renderer.resetGems(this.gemsCollected);
@@ -418,15 +452,26 @@ class GameManager {
       this.player.orbTriggered.clear();
       audio.updateShipThrust(0);
 
+      // Reset Style Meter
+      if (this.styleSystem) {
+        this.styleSystem.score = 0;
+        this.styleSystem.combo = 0;
+        this.styleSystem.multiplier = 1.0;
+        this.styleSystem.rankIdx = 0;
+        this.updateStyleHUD();
+      }
+
       // Reset boss entity
       if (this.bossManager) {
         this.bossManager.reset();
       }
 
       // Reset shield pickups
-      this.level.obstacles.forEach(o => {
-        if (o.type === 'shield') o.collected = false;
-      });
+      if (this.level && this.level.obstacles) {
+        this.level.obstacles.forEach(o => {
+          if (o.type === 'shield') o.collected = false;
+        });
+      }
       if (this.renderer && this.renderer.shieldPickupMeshes) {
         this.renderer.shieldPickupMeshes.forEach(sp => {
           sp.userData.isCollected = false;
@@ -459,18 +504,40 @@ class GameManager {
     this.gameState = 'PLAYING';
   }
 
-  onPlayerCrash() {
+  onPlayerCrash(cause = 'spike') {
     if (!this.player.isAlive) return;
 
-    // 🛡️ Active Energy Shield absorbs death impact!
+    // 🛡️ Active Energy Shield absorbs death impact with explosive deflection!
     if (this.player.hasShield) {
       this.player.hasShield = false;
-      this.player.invulnerableTimer = 0.9;
+      this.player.invulnerableTimer = 1.2; // Generous grace period
       audio.playShieldBreak();
+
+      // Physical deflection & hazard clearance impulse
+      this.player.vy = Math.max(15.0 * this.player.gravityDir, this.player.vy + 11.0 * this.player.gravityDir);
+      this.player.isGrounded = false;
+
       if (this.renderer) {
-        this.renderer.triggerShockwave(this.player.x, this.player.y + 0.5, 0x00f0ff, 4.2);
-        this.renderer.triggerScreenFlash(0.4);
+        if (this.renderer.triggerShieldShatter) {
+          this.renderer.triggerShieldShatter(this.player.x, this.player.y + 0.5);
+        }
+        if (this.renderer.triggerShockwave) {
+          this.renderer.triggerShockwave(this.player.x, this.player.y + 0.5, 0x00f0ff, 4.8);
+        }
+        if (this.renderer.triggerScreenFlash) {
+          this.renderer.triggerScreenFlash(0.35);
+        }
+        if (this.renderer.triggerComicHitText) {
+          this.renderer.triggerComicHitText(this.player.x, this.player.y + 1.2, "SHIELD DEFLECT! 🛡️⚡", "#00F0FF");
+        }
+        this.renderer.cameraTrauma = Math.max(this.renderer.cameraTrauma, 0.45);
+        if (this.renderer.faceExpression !== undefined) {
+          this.renderer.faceExpression = 'shield_active';
+        }
       }
+
+      this.addStylePoints(800, "SHIELD PARRY! 🛡️⚡");
+
       const shieldInd = document.getElementById('player-shield-indicator');
       if (shieldInd) shieldInd.style.display = 'none';
       return;
@@ -507,28 +574,44 @@ class GameManager {
     audio.playCrash();
     audio.updateShipThrust(0);
 
-    // Chaos Mode / Custom SFX on Crash
-    if (audio.customClips['crash']) {
-      audio.playMemeClip('crash', 0.95);
-    } else if (this.chaosMode === 'high' || (this.chaosMode === 'normal' && Math.random() < 0.45)) {
-      if (Math.random() < 0.5) {
-        audio.playMetalPipe(0.85);
-        if (this.renderer) {
-          this.renderer.triggerComicHitText(this.player.x, this.player.y + 0.8, "CLANGGG! 🔔", "#C0C0C0");
-        }
-      } else {
-        audio.playVineBoom(0.95);
-        if (this.renderer) {
-          this.renderer.triggerComicHitText(this.player.x, this.player.y + 0.8, "BOOM! 💥", "#FF2244");
+    if (cause === 'lava') {
+      audio.playLavaSizzle();
+      if (this.renderer) {
+        this.renderer.triggerLavaDeath(
+          new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0)
+        );
+        const lavaTexts = ["BOILING LAVA! 🌋", "INCINERATED! 🔥", "CRISPY! 💀", "EXTRA TOASTY! 🥓"];
+        this.renderer.triggerComicHitText(
+          this.player.x,
+          this.player.y + 0.8,
+          lavaTexts[Math.floor(Math.random() * lavaTexts.length)],
+          "#FF4500"
+        );
+      }
+    } else {
+      // Chaos Mode / Custom SFX on Crash
+      if (audio.customClips['crash']) {
+        audio.playMemeClip('crash', 0.95);
+      } else if (this.chaosMode === 'high' || (this.chaosMode === 'normal' && Math.random() < 0.45)) {
+        if (Math.random() < 0.5) {
+          audio.playMetalPipe(0.85);
+          if (this.renderer) {
+            this.renderer.triggerComicHitText(this.player.x, this.player.y + 0.8, "CLANGGG! 🔔", "#C0C0C0");
+          }
+        } else {
+          audio.playVineBoom(0.95);
+          if (this.renderer) {
+            this.renderer.triggerComicHitText(this.player.x, this.player.y + 0.8, "BOOM! 💥", "#FF2244");
+          }
         }
       }
-    }
 
-    // Trigger 3D shattered voxel explosion
-    this.renderer.triggerDeathExplosion(
-      new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0),
-      this.level.diffColor
-    );
+      // Trigger standard 3D shattered voxel explosion
+      this.renderer.triggerDeathExplosion(
+        new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0),
+        this.level.diffColor
+      );
+    }
 
     // Screen Flash Effect
     if (this.dom.screenFlash) {
@@ -1282,6 +1365,8 @@ class GameManager {
       rotationZ: this.player.rotationZ,
       vehicleMode: this.player.vehicleMode,
       gravityDir: this.player.gravityDir,
+      hasShield: !!this.player.hasShield,
+      gems: Array.from(this.gemsCollected),
       orbTriggered: Array.from(this.player.orbTriggered)
     });
     audio.playCheckpoint();
@@ -1412,6 +1497,51 @@ class GameManager {
       this.checkOrbTrigger();
     }
 
+    // 2b. 🌪️ Check Active Aero Fan Updraft Columns
+    let inAeroFan = false;
+    for (let i = 0; i < this.level.obstacles.length; i++) {
+      const obs = this.level.obstacles[i];
+      if (obs.type === 'fan' || obs.type === 'aero_fan') {
+        const fanW = obs.w || 3.2;
+        const fanH = obs.height || 7.5;
+        if (p.x >= obs.x - 0.25 && p.x <= obs.x + fanW + 0.25 && p.y >= obs.y - 0.35 && p.y <= obs.y + fanH) {
+          inAeroFan = true;
+          const liftForce = obs.liftForce || 105.0;
+          const maxVy = obs.maxLiftVy || 17.5;
+          const relY = Math.max(0, p.y - obs.y);
+          const taperStart = fanH * 0.62;
+          let taper = 1.0;
+          if (relY > taperStart) {
+            const t = Math.min(1.0, (relY - taperStart) / (fanH - taperStart));
+            taper = Math.max(0, Math.cos(t * Math.PI * 0.5));
+          }
+
+          const effectiveLift = liftForce * taper * p.gravityDir;
+          p.vy += effectiveLift * dt;
+          if (p.gravityDir === 1) {
+            p.vy = Math.min(maxVy, p.vy);
+          } else {
+            p.vy = Math.max(-maxVy, p.vy);
+          }
+          p.isGrounded = false;
+          audio.playAeroFanLift(0.45);
+
+          // Interactive Aero Boost on Jump press inside wind column
+          if (this.jumpBufferTimer > 0) {
+            this.jumpBufferTimer = 0;
+            p.vy = (maxVy + 2.5) * p.gravityDir;
+            audio.playAeroBoost();
+            if (this.renderer) {
+              const boostColor = (obs.subType === 'magma' ? 0xff4500 : (obs.subType === 'emerald' ? 0x00ff88 : 0x00f0ff));
+              this.renderer.triggerShockwave(p.x, p.y + 0.5, boostColor, 3.4);
+              this.renderer.triggerJumpSquash();
+            }
+          }
+          break;
+        }
+      }
+    }
+
     // 3. Vertical Motion per Vehicle Mode
     if (p.vehicleMode === 'cube') {
       const gravity = -48.0 * p.gravityDir;
@@ -1419,7 +1549,7 @@ class GameManager {
       p.y += p.vy * dt;
 
       // Auto-Jump (Buffered Jump or Hold-to-Jump)
-      if ((p.isGrounded || this.coyoteTimer > 0) && (this.jumpBufferTimer > 0 || p.isHolding)) {
+      if (!inAeroFan && (p.isGrounded || this.coyoteTimer > 0) && (this.jumpBufferTimer > 0 || p.isHolding)) {
         this.jumpBufferTimer = 0;
         this.coyoteTimer = 0;
         p.vy = 16.5 * p.gravityDir;
@@ -1429,7 +1559,11 @@ class GameManager {
       }
 
       if (!p.isGrounded) {
-        p.rotationZ -= 8.5 * dt * p.gravityDir;
+        if (inAeroFan) {
+          p.rotationZ = Math.sin(p.x * 3.5) * 0.15 * p.gravityDir;
+        } else {
+          p.rotationZ -= 8.5 * dt * p.gravityDir;
+        }
       } else {
         const halfPi = Math.PI / 2;
         p.rotationZ = Math.round(p.rotationZ / halfPi) * halfPi;
@@ -1601,8 +1735,14 @@ class GameManager {
                   Math.abs((o.y + (o.h || 2)) - top) < 0.15
                 );
                 if (!isInternalSeam) {
-                  this.onPlayerCrash();
-                  return;
+                  if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                    p.y = top;
+                    p.vy = 0;
+                    p.isGrounded = true;
+                  } else {
+                    this.onPlayerCrash();
+                    return;
+                  }
                 }
               }
             }
@@ -1624,13 +1764,25 @@ class GameManager {
                   Math.abs(o.y - bottom) < 0.15
                 );
                 if (!isInternalSeam) {
-                  this.onPlayerCrash();
-                  return;
+                  if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                    p.y = bottom - 1.0;
+                    p.vy = 0;
+                    p.isGrounded = true;
+                  } else {
+                    this.onPlayerCrash();
+                    return;
+                  }
                 }
               }
             } else {
-              this.onPlayerCrash();
-              return;
+              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                p.y = top;
+                p.vy = 0;
+                p.isGrounded = true;
+              } else {
+                this.onPlayerCrash();
+                return;
+              }
             }
           } else if (p.vehicleMode === 'ship' || p.vehicleMode === 'ufo') {
             if (p.gravityDir === 1 && playerBottom >= top - 0.45) {
@@ -1642,9 +1794,148 @@ class GameManager {
               p.vy = Math.min(0, p.vy);
               p.isGrounded = true;
             } else {
+              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                if (p.gravityDir === 1) p.y = top;
+                else p.y = bottom - 1.0;
+                p.vy = 0;
+                p.isGrounded = true;
+              } else {
+                this.onPlayerCrash();
+                return;
+              }
+            }
+          } else {
+            if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+              p.y = top;
+              p.vy = 0;
+              p.isGrounded = true;
+            } else {
               this.onPlayerCrash();
               return;
             }
+          }
+        }
+      }
+      else if (obs.type === 'stairs') {
+        const numSteps = obs.steps || 4;
+        const stepW = obs.stepW || 1.2;
+        const stepH = obs.stepH || 0.5;
+        const dir = obs.dir || 'up';
+        const totalW = numSteps * stepW;
+        const sx = obs.x;
+        const sy = obs.y;
+
+        if (px >= sx - 0.25 && px <= sx + totalW + 0.15) {
+          const relX = Math.max(0, Math.min(totalW - 0.001, px - sx));
+          const stepIdx = Math.floor(relX / stepW);
+          const stepTop = (dir === 'down')
+            ? sy + (numSteps - stepIdx) * stepH
+            : sy + (stepIdx + 1) * stepH;
+          const prevStepTop = (dir === 'down')
+            ? sy + (numSteps - Math.max(0, stepIdx - 1)) * stepH
+            : sy + stepIdx * stepH;
+
+          if (p.gravityDir === 1) {
+            // Smooth step climb & tread landing
+            if (p.y >= Math.min(prevStepTop, stepTop) - 0.32 && p.y <= Math.max(prevStepTop, stepTop) + 0.38 && p.vy <= 2.2) {
+              if (!p.isGrounded) {
+                audio.playMechanicalLanding();
+                this.renderer.triggerLandingSquash();
+              } else if (Math.abs(p.y - stepTop) > 0.12) {
+                audio.playStairStep(1.0 + stepIdx * 0.08);
+              }
+              p.y = stepTop;
+              p.vy = 0;
+              p.isGrounded = true;
+            } else if (px > sx + 0.12 && p.y < stepTop - 0.45 && p.y > sy - 0.2) {
+              this.onPlayerCrash();
+              return;
+            }
+          } else {
+            // Inverted gravity stair climbing
+            const invTop = (dir === 'down')
+              ? sy - (numSteps - stepIdx) * stepH
+              : sy - (stepIdx + 1) * stepH;
+            if (p.y <= invTop + 0.35 && p.vy >= -2.2) {
+              p.y = invTop - 1.0;
+              p.vy = 0;
+              p.isGrounded = true;
+            }
+          }
+        }
+      }
+      else if (obs.type === 'lava' || obs.type === 'lava_pit') {
+        const lavaW = obs.w || 8.0;
+        const lavaH = obs.h || 0.8;
+        if (px >= obs.x + 0.15 && px <= obs.x + lavaW - 0.15) {
+          const lavaSurface = obs.y + lavaH;
+          if (p.y <= lavaSurface - 0.05) {
+            this.onPlayerCrash('lava');
+            return;
+          } else if (!obs.nearMiss && p.y > lavaSurface - 0.05 && p.y <= lavaSurface + 0.25) {
+            obs.nearMiss = true;
+            audio.playLavaSizzle();
+            if (this.renderer) {
+              this.renderer.triggerScreenFlash(0.12);
+              this.renderer.emitSparkParticle(px, lavaSurface + 0.2);
+            }
+          }
+        }
+      }
+      else if (obs.type === 'lava_bubble') {
+        const bw = obs.w || 2.2;
+        const bh = obs.h || 1.4;
+        if (px >= obs.x - 0.28 && px <= obs.x + bw + 0.28) {
+          if (p.y >= obs.y - 0.2 && p.y <= obs.y + bh + 0.35) {
+            this.onPlayerCrash('lava');
+            return;
+          }
+        }
+      }
+      else if (obs.type === 'lava_crystal') {
+        const halfW = 0.36;
+        const dx = Math.abs(px - obs.x);
+        if (dx < halfW) {
+          const slopeRatio = (1.0 - dx / halfW);
+          if (obs.dir === 'down') {
+            const deadlyY = obs.y - slopeRatio * 0.80;
+            const playerTop = p.y + 0.90;
+            const playerBottom = p.y + 0.05;
+            if (playerTop > deadlyY && playerBottom < obs.y) {
+              this.onPlayerCrash('lava');
+              return;
+            }
+          } else {
+            const deadlyY = obs.y + slopeRatio * 0.80;
+            const playerTop = p.y + 0.95;
+            const playerBottom = p.y + 0.05;
+            if (playerBottom < deadlyY && playerTop > obs.y + 0.05) {
+              this.onPlayerCrash('lava');
+              return;
+            }
+          }
+        }
+      }
+      else if (obs.type === 'lava_crust') {
+        const cw = obs.w || 3.0;
+        const ch = obs.h || 1.2;
+        const left = obs.x;
+        const right = obs.x + cw;
+        const top = obs.y + ch;
+        const playerLeft = px - 0.36;
+        const playerRight = px + 0.36;
+        const playerBottom = p.y;
+        const playerTop = p.y + 1.0;
+
+        if (playerRight > left + 0.05 && playerLeft < right - 0.05 && playerTop > obs.y + 0.05 && playerBottom < top - 0.02) {
+          if (playerBottom >= top - 0.45 && p.vy <= 0.5) {
+            if (!p.isGrounded) {
+              audio.playMechanicalLanding();
+              this.renderer.triggerLandingSquash();
+            }
+            p.y = top;
+            p.vy = 0;
+            p.isGrounded = true;
           } else {
             this.onPlayerCrash();
             return;
@@ -1745,8 +2036,19 @@ class GameManager {
             this.currentSpeedMult = obs.speedMult;
             this.level.speed = (this.level.baseSpeed || 11.0) * obs.speedMult;
             audio.playSpeedGate(obs.speedMult);
-            this.renderer.triggerShockwave(obs.x, py, 0x00ffff, 3.8);
-            this.renderer.triggerScreenFlash(0.2);
+            if (this.renderer) {
+              if (this.renderer.triggerShockwave) {
+                this.renderer.triggerShockwave(obs.x, py, 0x00ffff, 3.8);
+              }
+              if (this.renderer.triggerScreenFlash) {
+                this.renderer.triggerScreenFlash(0.2);
+              }
+              if (this.renderer.triggerComicHitText) {
+                this.renderer.triggerComicHitText(obs.x, py + 1.2, `WARP ${obs.speedMult}X! ⚡`, "#00FFFF");
+              }
+              this.renderer.faceExpression = (obs.speedMult > 1.0 ? 'hyperspeed' : 'normal');
+            }
+            this.addStylePoints(500, `WARP ${obs.speedMult}X! ⚡`);
           }
         }
       }
@@ -1754,13 +2056,22 @@ class GameManager {
         if (!obs.collected && Math.abs(px - obs.x) < 1.4 && Math.abs(py - obs.y) < 1.4) {
           obs.collected = true;
           p.hasShield = true;
-          const shieldMesh = this.renderer.shieldPickupMeshes?.find(m => m.userData.obstacle === obs);
+          const shieldMesh = this.renderer?.shieldPickupMeshes?.find(m => m.userData.obstacle === obs);
           if (shieldMesh) {
             shieldMesh.userData.isCollected = true;
             shieldMesh.visible = false;
           }
           audio.playShieldCollect();
-          this.renderer.triggerShockwave(obs.x, obs.y, 0x00f0ff, 3.4);
+          if (this.renderer) {
+            if (this.renderer.triggerShockwave) {
+              this.renderer.triggerShockwave(obs.x, obs.y, 0x00f0ff, 3.4);
+            }
+            if (this.renderer.triggerComicHitText) {
+              this.renderer.triggerComicHitText(obs.x, obs.y + 1.2, "SHIELD CHARGED! 🛡️", "#00F0FF");
+            }
+            this.renderer.faceExpression = 'shield_active';
+          }
+          this.addStylePoints(400, "SHIELD UP! 🛡️");
           const shieldInd = document.getElementById('player-shield-indicator');
           if (shieldInd) shieldInd.style.display = 'block';
         }
@@ -1795,13 +2106,14 @@ class GameManager {
       g.x += (this.level.speed * (1.0 + g.offset * 0.05)) * dt;
       g.jumpCooldown -= dt;
 
-      // Lookahead obstacle detection
+      // Lookahead obstacle detection (spikes, lava pits, magma bubbles, crystals)
       const lookahead = 2.4;
-      const upcomingSpike = this.level.obstacles.find(obs =>
-        obs.type === 'spike' && (obs.x > g.x && obs.x < g.x + lookahead) && Math.abs(obs.y - g.y) < 1.0
+      const upcomingHazard = this.level.obstacles.find(obs =>
+        (obs.type === 'spike' || obs.type === 'lava' || obs.type === 'lava_bubble' || obs.type === 'lava_crystal') &&
+        (obs.x > g.x && obs.x < g.x + lookahead) && Math.abs((obs.y || 0) - g.y) < 1.4
       );
 
-      if (upcomingSpike && g.jumpCooldown <= 0 && g.isGrounded) {
+      if (upcomingHazard && g.jumpCooldown <= 0 && g.isGrounded) {
         if (Math.random() < g.skill) {
           g.vy = 16.5 * g.gravityDir;
           g.isGrounded = false;
@@ -1812,23 +2124,162 @@ class GameManager {
         }
       }
 
+      // 🌪️ Fan Updraft Lift for Ghost
+      const currentFan = this.level.obstacles.find(obs =>
+        (obs.type === 'fan' || obs.type === 'aero_fan') && (g.x >= obs.x - 0.2 && g.x <= obs.x + (obs.w || 3.2) + 0.2)
+      );
+      if (currentFan) {
+        g.vy = Math.min(16.0, g.vy + (currentFan.liftForce || 105.0) * dt);
+        g.isGrounded = false;
+      }
+
       // Gravity
       g.vy -= 48.0 * dt * g.gravityDir;
       g.y += g.vy * dt;
 
-      if (g.y <= 0) {
-        g.y = 0;
-        g.vy = 0;
-        g.isGrounded = true;
-        const halfPi = Math.PI / 2;
-        g.rotationZ = Math.round(g.rotationZ / halfPi) * halfPi;
-      } else {
-        g.isGrounded = false;
-        g.rotationZ -= 8.5 * dt * g.gravityDir;
+      // 🪜 Check Stairs for Ghost
+      let onGhostStair = false;
+      const currentStair = this.level.obstacles.find(obs =>
+        obs.type === 'stairs' && (g.x >= obs.x - 0.2 && g.x <= obs.x + (obs.steps || 4) * (obs.stepW || 1.2) + 0.2)
+      );
+      if (currentStair) {
+        const numSteps = currentStair.steps || 4;
+        const stepW = currentStair.stepW || 1.2;
+        const stepH = currentStair.stepH || 0.5;
+        const relX = Math.max(0, Math.min(numSteps * stepW - 0.001, g.x - currentStair.x));
+        const stepIdx = Math.floor(relX / stepW);
+        const stepTop = currentStair.dir === 'down'
+          ? currentStair.y + (numSteps - stepIdx) * stepH
+          : currentStair.y + (stepIdx + 1) * stepH;
+        if (g.y <= stepTop + 0.25) {
+          g.y = stepTop;
+          g.vy = 0;
+          g.isGrounded = true;
+          onGhostStair = true;
+        }
+      }
+
+      if (!onGhostStair) {
+        if (g.y <= 0) {
+          g.y = 0;
+          g.vy = 0;
+          g.isGrounded = true;
+          const halfPi = Math.PI / 2;
+          g.rotationZ = Math.round(g.rotationZ / halfPi) * halfPi;
+        } else {
+          g.isGrounded = false;
+          g.rotationZ -= 8.5 * dt * g.gravityDir;
+        }
       }
 
       this.renderer.updateGhost(g.id, g.x, g.y + 0.45, g.rotationZ, g.isAlive);
     });
+  }
+
+  // -------------------------------------------------------------
+  // 🏆 DYNAMIC "ULTRAKILL / DEVIL MAY CRY" RHYTHM STYLE ENGINE
+  // -------------------------------------------------------------
+
+  addStylePoints(basePoints, label = '') {
+    if (!this.player.isAlive || this.gameState !== 'PLAYING') return;
+    if (!this.styleSystem) return;
+
+    this.styleSystem.combo++;
+    this.styleSystem.multiplier = Math.min(4.0, 1.0 + (this.styleSystem.combo - 1) * 0.12);
+    const addedScore = Math.round(basePoints * this.styleSystem.multiplier);
+    this.styleSystem.score += addedScore;
+    this.styleSystem.decayTimer = 2.8;
+
+    let currentIdx = 0;
+    for (let i = this.styleSystem.ranks.length - 1; i >= 0; i--) {
+      if (this.styleSystem.score >= this.styleSystem.ranks[i].minScore) {
+        currentIdx = i;
+        break;
+      }
+    }
+
+    const prevIdx = this.styleSystem.rankIdx;
+    this.styleSystem.rankIdx = currentIdx;
+    const currentRank = this.styleSystem.ranks[currentIdx];
+
+    if (currentIdx > prevIdx) {
+      // Rank Up Fanfare!
+      if (this.renderer && this.renderer.triggerComicHitText) {
+        this.renderer.triggerComicHitText(
+          this.player.x + 1.2,
+          this.player.y + 1.6,
+          `RANK ${currentRank.letter}! ${currentRank.label}`,
+          currentRank.color
+        );
+      }
+      if (this.renderer && this.renderer.triggerShockwave) {
+        this.renderer.triggerShockwave(this.player.x, this.player.y + 0.5, parseInt(currentRank.color.replace('#', '0x')), 3.8);
+      }
+      audio.playOrbChime();
+    }
+
+    this.updateStyleHUD(label, addedScore);
+  }
+
+  updateStyleHUD(label = '', lastAdded = 0) {
+    if (!this.styleSystem) return;
+    const rank = this.styleSystem.ranks[this.styleSystem.rankIdx];
+    const letterEl = document.getElementById('style-rank-letter');
+    const labelEl = document.getElementById('style-rank-label');
+    const comboEl = document.getElementById('style-combo-val');
+    const scoreEl = document.getElementById('style-score-val');
+    const multEl = document.getElementById('style-mult-val');
+    const fillEl = document.getElementById('style-bar-fill');
+
+    if (letterEl) {
+      letterEl.textContent = rank.letter;
+      letterEl.style.color = rank.color;
+      letterEl.style.textShadow = `0 0 16px ${rank.color}`;
+      letterEl.classList.remove('rank-pulse');
+      void letterEl.offsetWidth;
+      letterEl.classList.add('rank-pulse');
+    }
+    if (labelEl) {
+      labelEl.textContent = rank.label;
+      labelEl.style.color = rank.color;
+    }
+    if (comboEl) comboEl.textContent = `${this.styleSystem.combo}x`;
+    if (multEl) multEl.textContent = `${this.styleSystem.multiplier.toFixed(1)}x`;
+    if (scoreEl) scoreEl.textContent = this.styleSystem.score.toLocaleString();
+
+    if (fillEl) {
+      const nextRank = this.styleSystem.ranks[this.styleSystem.rankIdx + 1];
+      if (nextRank) {
+        const range = nextRank.minScore - rank.minScore;
+        const progress = Math.min(1.0, (this.styleSystem.score - rank.minScore) / range);
+        fillEl.style.width = `${(progress * 100).toFixed(0)}%`;
+        fillEl.style.background = rank.color;
+      } else {
+        fillEl.style.width = '100%';
+        fillEl.style.background = '#ff00ff';
+      }
+    }
+  }
+
+  updateStyleDecay(dt) {
+    if (!this.styleSystem) return;
+    if (this.styleSystem.decayTimer > 0) {
+      this.styleSystem.decayTimer -= dt;
+    } else if (this.styleSystem.score > 0) {
+      this.styleSystem.score = Math.max(0, this.styleSystem.score - Math.round(160 * dt));
+      this.styleSystem.combo = Math.max(0, this.styleSystem.combo - Math.round(1 * dt));
+      this.styleSystem.multiplier = Math.max(1.0, 1.0 + (this.styleSystem.combo) * 0.1);
+
+      let currentIdx = 0;
+      for (let i = this.styleSystem.ranks.length - 1; i >= 0; i--) {
+        if (this.styleSystem.score >= this.styleSystem.ranks[i].minScore) {
+          currentIdx = i;
+          break;
+        }
+      }
+      this.styleSystem.rankIdx = currentIdx;
+      this.updateStyleHUD();
+    }
   }
 
   // -------------------------------------------------------------
@@ -1840,6 +2291,14 @@ class GameManager {
     this.dom.progressBar.style.width = `${progress}%`;
     this.dom.progressPercent.textContent = `${progress.toFixed(1)}%`;
     this.dom.playerMarker.style.left = `${progress}%`;
+
+    // Real-Time Speedometer Refresh
+    const speedEl = document.getElementById('speedometer-val');
+    if (speedEl) {
+      const mach = (this.level.speed / 11.0).toFixed(1);
+      const mode = this.currentSpeedMult >= 2.0 ? 'WARP DRIVE' : (this.currentSpeedMult >= 1.5 ? 'HYPER DRIVE' : (this.currentSpeedMult < 1.0 ? 'SLOW-MO' : 'CRUISING'));
+      speedEl.innerHTML = `⚡ MACH <span>${mach}</span> • ${mode}`;
+    }
 
     // Best Record
     if (progress > this.bestScores[this.currentLevelIndex]) {
@@ -2473,6 +2932,7 @@ class GameManager {
 
     // 1. Update Player Physics & Collisions
     this.updatePhysics(dt);
+    this.updateStyleDecay(dt);
 
     // 1b. Update Meme Chaos Timers (Tung Tung Sahur Random Event)
     if (this.gameState === 'PLAYING' && this.chaosMode !== 'off') {
@@ -2500,6 +2960,8 @@ class GameManager {
       vehicleMode: this.player.vehicleMode,
       gravityDir: this.player.gravityDir,
       hasShield: this.player.hasShield,
+      invulnerableTimer: this.player.invulnerableTimer || 0,
+      speedMult: this.currentSpeedMult || 1.0,
       isGrounded: this.player.isGrounded,
       isAlive: this.player.isAlive,
       isThrusting: this.player.isHolding,

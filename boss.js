@@ -172,7 +172,9 @@ export class BossManager {
 
     // Audio Alert
     audio.playBossAlert();
-    this.renderer.triggerScreenFlash(0.6);
+    if (this.renderer && this.renderer.triggerScreenFlash) {
+      this.renderer.triggerScreenFlash(0.6);
+    }
     this.renderer.cameraTrauma = Math.max(this.renderer.cameraTrauma, 0.6);
 
     // Show Boss HUD & Intro Warning
@@ -499,7 +501,9 @@ export class BossManager {
     this.phase = 4;
     audio.playBossExplode();
     this.renderer.cameraTrauma = 1.0;
-    this.renderer.triggerScreenFlash(1.0);
+    if (this.renderer && this.renderer.triggerScreenFlash) {
+      this.renderer.triggerScreenFlash(1.0);
+    }
     this.renderer.triggerShockwave(this.bossMesh.position.x, this.bossMesh.position.y, 0xffffff, 9.0);
 
     // Clear active attacks
