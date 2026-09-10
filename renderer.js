@@ -62,6 +62,7 @@ export class GameRenderer {
     this.orbMeshes = [];
     this.padMeshes = [];
     this.checkpointMeshes = [];
+    this.checkpointGateMeshes = [];
     this.spikeMeshes = [];
     this.stairMeshes = [];
     this.fanMeshes = [];
@@ -313,6 +314,7 @@ export class GameRenderer {
     this.orbMeshes = [];
     this.padMeshes = [];
     this.checkpointMeshes = [];
+    this.checkpointGateMeshes = [];
     this.spikeMeshes = [];
     this.gemMeshes = [];
     this.stairMeshes = [];
@@ -1582,6 +1584,76 @@ export class GameRenderer {
       };
       this.spikeMeshes.push(crystalGroup);
       this.obstaclesGroup.add(crystalGroup);
+    }
+    else if (type === "checkpoint") {
+      const cpGroup = new THREE.Group();
+      cpGroup.position.set(x, y, 0);
+
+      // Dual Gothic / Sci-Fi Checkpoint Obelisks / Pillars
+      const pillarGeo = new THREE.BoxGeometry(0.55, 4.4, 0.55);
+      const pillarMat = new THREE.MeshStandardMaterial({
+        color: 0x141824,
+        roughness: 0.35,
+        metalness: 0.85
+      });
+
+      const leftPillar = new THREE.Mesh(pillarGeo, pillarMat);
+      leftPillar.position.set(-1.8, 2.2, 0);
+      cpGroup.add(leftPillar);
+
+      const rightPillar = new THREE.Mesh(pillarGeo, pillarMat);
+      rightPillar.position.set(1.8, 2.2, 0);
+      cpGroup.add(rightPillar);
+
+      // Glowing Pillar Core Neon Strips
+      const stripGeo = new THREE.PlaneGeometry(0.12, 3.6);
+      const stripMat = new THREE.MeshBasicMaterial({ color: 0x00ff88, side: THREE.DoubleSide });
+      const leftStrip = new THREE.Mesh(stripGeo, stripMat);
+      leftStrip.position.set(-1.8, 2.2, 0.29);
+      cpGroup.add(leftStrip);
+      const rightStrip = new THREE.Mesh(stripGeo, stripMat);
+      rightStrip.position.set(1.8, 2.2, 0.29);
+      cpGroup.add(rightStrip);
+
+      // Top Crossbar Arch
+      const archGeo = new THREE.BoxGeometry(4.2, 0.45, 0.65);
+      const archMat = new THREE.MeshStandardMaterial({ color: 0x222a38, metalness: 0.9, roughness: 0.2 });
+      const arch = new THREE.Mesh(archGeo, archMat);
+      arch.position.set(0, 4.3, 0);
+      cpGroup.add(arch);
+
+      // Checkpoint Floating Rune Core
+      const coreGeo = new THREE.OctahedronGeometry(0.65, 0);
+      const coreMat = new THREE.MeshStandardMaterial({
+        color: 0x00ff88,
+        emissive: 0x00cc66,
+        emissiveIntensity: 0.9,
+        roughness: 0.15,
+        metalness: 0.1
+      });
+      const core = new THREE.Mesh(coreGeo, coreMat);
+      core.position.set(0, 2.2, 0);
+      cpGroup.add(core);
+
+      // Revolving Torus Ring
+      const ringGeo = new THREE.TorusGeometry(1.2, 0.06, 16, 32);
+      const ringMat = new THREE.MeshBasicMaterial({ color: 0x00e5ff, wireframe: true });
+      const ring = new THREE.Mesh(ringGeo, ringMat);
+      ring.position.set(0, 2.2, 0);
+      cpGroup.add(ring);
+
+      cpGroup.userData = {
+        obstacle: obs,
+        core,
+        ring,
+        leftStrip,
+        rightStrip,
+        activated: false
+      };
+
+      if (!this.checkpointGateMeshes) this.checkpointGateMeshes = [];
+      this.checkpointGateMeshes.push(cpGroup);
+      this.obstaclesGroup.add(cpGroup);
     }
   }
 
@@ -3332,6 +3404,28 @@ export class GameRenderer {
     });
   }
 
+  // 🚩 Checkpoint Activation Energy Burst & Audio-Visual Chime
+  triggerCheckpointEffect(x, y) {
+    if (this.triggerShockwave) {
+      this.triggerShockwave(x, y + 2.0, 0x00ff88, 3.8);
+      this.triggerShockwave(x, y + 2.0, 0x00f0ff, 2.2);
+    }
+    this.triggerScreenFlash(0.2, 0x00ff88);
+    this.triggerScreenShake(0.65, 0.25);
+
+    if (this.checkpointGateMeshes) {
+      const gate = this.checkpointGateMeshes.find(g => Math.abs(g.position.x - x) < 2.5);
+      if (gate && gate.userData) {
+        gate.userData.activated = true;
+        if (gate.userData.core) {
+          gate.userData.core.material.emissive.setHex(0x00ff88);
+          gate.userData.core.material.emissiveIntensity = 2.4;
+          gate.userData.core.scale.set(1.5, 1.5, 1.5);
+        }
+      }
+    }
+  }
+
   triggerStoneCrumble(x, y) {
     if (this.triggerShockwave) {
       this.triggerShockwave(x, y, 0x8b1025, 1.8);
@@ -4080,6 +4174,23 @@ export class GameRenderer {
       mesh.rotation.y += dt * 2.5;
       mesh.position.y += Math.sin(time * 3 + idx) * 0.006;
     });
+
+    // 🚩 Checkpoint Gates rotation & floating crystal core
+    if (this.checkpointGateMeshes && this.checkpointGateMeshes.length > 0) {
+      this.checkpointGateMeshes.forEach((gate, idx) => {
+        const u = gate.userData;
+        if (u.core) {
+          u.core.rotation.y += dt * 2.5;
+          u.core.rotation.z += dt * 1.8;
+          u.core.position.y = 2.2 + Math.sin(time * 3.5 + idx) * 0.15;
+        }
+        if (u.ring) {
+          u.ring.rotation.x += dt * 3.2;
+          u.ring.rotation.y += dt * 1.6;
+          u.ring.position.y = 2.2 + Math.sin(time * 3.5 + idx) * 0.15;
+        }
+      });
+    }
 
     // Spikes floating energy core animation
     this.spikeMeshes.forEach(sp => {

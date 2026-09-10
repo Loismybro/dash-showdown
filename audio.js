@@ -192,14 +192,14 @@ class AudioManager {
   // PROCEDURAL HUNGRY SHARK / HYBRID CINEMATIC MUSIC ENGINE
   // -------------------------------------------------------------
 
-  startMusic(bpm = 130, trackTheme = 1) {
+  startMusic(bpm = 130, trackTheme = 1, startStep = 0, startBar = 0) {
     this.init();
     if (!this.ctx) return;
 
     this.bpm = bpm;
     this.trackTheme = trackTheme;
-    this.step = 0;
-    this.bar = 0;
+    this.step = (startStep || 0) % 16;
+    this.bar = (startBar || 0) % 8;
     this.isPlaying = true;
     this.isGoldRush = (trackTheme >= 3);
 
@@ -257,6 +257,25 @@ class AudioManager {
     this.nextNoteTime = this.ctx.currentTime + 0.05;
     if (this.timerID) clearInterval(this.timerID);
     this.timerID = setInterval(() => this.scheduler(), this.lookahead);
+  }
+
+  getBeatPosition() {
+    return {
+      step: this.step || 0,
+      bar: this.bar || 0,
+      bpm: this.bpm || 130,
+      trackTheme: this.trackTheme || 1,
+      trackProgression: this.trackProgression || 0
+    };
+  }
+
+  setBeatPosition(step = 0, bar = 0, trackProgression = 0) {
+    this.step = (step || 0) % 16;
+    this.bar = (bar || 0) % 8;
+    this.trackProgression = Math.max(0, Math.min(1.0, trackProgression || 0));
+    if (this.ctx && this.isPlaying) {
+      this.nextNoteTime = this.ctx.currentTime + 0.05;
+    }
   }
 
   scheduler() {

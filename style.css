@@ -2638,3 +2638,56 @@ body, html {
   }
 }
 
+/* 🚩 Checkpoint Activated Toast Notification */
+.checkpoint-toast {
+  position: fixed;
+  top: 72px;
+  left: 50%;
+  transform: translateX(-50%) translateY(-24px);
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 8px 20px;
+  background: rgba(9, 18, 14, 0.92);
+  border: 1px solid #00ff88;
+  box-shadow: 0 0 25px rgba(0, 255, 136, 0.45), inset 0 0 12px rgba(0, 255, 136, 0.15);
+  border-radius: 30px;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: 10000;
+  pointer-events: none;
+  opacity: 0;
+  transition: transform 0.35s cubic-bezier(0.18, 0.89, 0.32, 1.28), opacity 0.3s ease;
+}
+
+.checkpoint-toast.show {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+.cp-toast-icon {
+  font-size: 20px;
+  filter: drop-shadow(0 0 8px #00ff88);
+}
+
+.cp-toast-content {
+  display: flex;
+  flex-direction: column;
+}
+
+.cp-toast-tag {
+  font-size: 9px;
+  font-weight: 800;
+  letter-spacing: 1.5px;
+  color: #00ff88;
+  text-transform: uppercase;
+}
+
+.cp-toast-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #ffffff;
+  letter-spacing: 0.5px;
+}
+
+

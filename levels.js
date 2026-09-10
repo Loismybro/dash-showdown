@@ -12,123 +12,143 @@ export const LEVEL_DATA = [
     bpm: 142,
     theme: 1,
     speed: 11.0,
-    endX: 420,
+    endX: 840,
+    ceilY: 24.0,
     defaultVehicle: "cube",
     desc: "Ominous gothic fortress! Living environment with rain, creeping fog, igniting torches, arcane energy surges, lightning storms, and a collapsing finale.",
     obstacles: [
       // ═════════════════════════════════════════════════════════════════
-      // ACT I: COURTYARD ENTRANCE & BATTLEMENT RAMPARTS (x: 0 – 90)
+      // ACT I: COURTYARD ENTRANCE & BATTLEMENT RAMPARTS (x: 0 – 175)
       // ═════════════════════════════════════════════════════════════════
       // Intro Courtyard Warmup Spike
-      { type: "spike", x: 26, y: 0, dir: "up" },
+      { type: "spike", x: 28, y: 0, dir: "up" },
 
       // 🪜 Gothic Rampart Ascending Stairs (Smooth step-up to Y=1.5)
-      { type: "stairs", x: 34, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
-      { type: "block",  x: 37.6, y: 0, w: 5.0, h: 1.5 },
-      { type: "gem",    x: 40.0, y: 3.2, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "stairs", x: 42, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
+      { type: "block",  x: 45.6, y: 0, w: 8.0, h: 1.5 },
+      { type: "gem",    x: 49.0, y: 3.2, subType: "ruby", color: 0xc41230, value: 100 },
       // Descending Stairs back to courtyard
-      { type: "stairs", x: 42.6, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
+      { type: "stairs", x: 53.6, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
 
       // 🌪️ Castle Brimstone Moat Aero Fan Launch over Boiling Lava Lake
-      { type: "fan",    x: 47.5, y: 0, w: 3.2, height: 8.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
+      { type: "fan",    x: 76.0, y: 0, w: 3.2, height: 8.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
       // 🌋 Molten Lava Lake across the chasm
-      { type: "lava",   x: 50.0, y: 0, w: 9.0, h: 0.8 },
-      { type: "gem",    x: 54.0, y: 5.5, subType: "ruby", color: 0xc41230, value: 100 },
-      // High Battlement Landing
-      { type: "block",  x: 58.0, y: 0, w: 10.0, h: 2.5 },
-      { type: "spike",  x: 65.0, y: 2.5, dir: "up" },
+      { type: "lava",   x: 80.0, y: 0, w: 10.0, h: 0.8 },
+      { type: "gem",    x: 85.0, y: 5.5, subType: "ruby", color: 0xc41230, value: 100 },
+      // High Battlement Landing Platform
+      { type: "block",  x: 90.0, y: 0, w: 14.0, h: 2.5 },
+      { type: "spike",  x: 100.0, y: 2.5, dir: "up" },
+      { type: "stairs", x: 104.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.6, dir: "down", subType: "gothic" },
 
-      // Moat drop & double obsidian spikes
-      { type: "spike",  x: 74.0, y: 0, dir: "up" },
-      { type: "spike",  x: 76.5, y: 0, dir: "up" },
+      // Moat drop & rhythm obsidian spikes
+      { type: "spike",  x: 130.0, y: 0, dir: "up" },
+      { type: "spike",  x: 148.0, y: 0, dir: "up" },
+
+      // 🚩 CHECKPOINT 1: THE CATHEDRAL CRYPT GATE
+      { type: "checkpoint", x: 175.0, y: 0, respawnY: 0, title: "Cathedral Crypt Gate" },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT II: GARGOYLE TOWER & CATHEDRAL CRYPT (x: 90 – 210)
+      // ACT II: GARGOYLE TOWER & CATHEDRAL CRYPT (x: 175 – 360)
       // ═════════════════════════════════════════════════════════════════
       // 🪜 Gargoyle Tower Stepped Ascent
-      { type: "stairs", x: 84.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.6, dir: "up", subType: "gothic" },
-      { type: "pad",    x: 89.5, y: 2.4, subType: "yellow" }, // Launches over double moat!
+      { type: "stairs", x: 188.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.6, dir: "up", subType: "gothic" },
+      { type: "pad",    x: 194.0, y: 2.4, subType: "yellow" }, // Launches over double moat!
       // 🌋 Boiling Magma Chasm with mid-air save orb
-      { type: "lava",   x: 93.0, y: 0, w: 12.0, h: 0.8 },
-      { type: "orb",    x: 98.5, y: 5.0, subType: "yellow" },
-      { type: "gem",    x: 98.5, y: 6.2, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "lava",   x: 198.0, y: 0, w: 16.0, h: 0.8 },
+      { type: "orb",    x: 206.0, y: 5.0, subType: "yellow" },
+      { type: "gem",    x: 206.0, y: 6.2, subType: "ruby", color: 0xc41230, value: 100 },
       // 🌋 Floating Volcanic Basalt Stepping Platform
-      { type: "lava_crust", x: 104.0, y: 0, w: 7.0, h: 2.0 },
+      { type: "lava_crust", x: 216.0, y: 0, w: 10.0, h: 2.0 },
       // 🌋 Active Magma Bubble Hazard Block
-      { type: "lava_bubble", x: 117.0, y: 0, w: 2.2, h: 1.4 },
+      { type: "lava_bubble", x: 232.0, y: 0, w: 2.4, h: 1.4 },
 
       // Cathedral Interior - Rhythm Spikes & Energy Shield
-      { type: "spike",  x: 128.0, y: 0, dir: "up" },
-      { type: "shield", x: 136.0, y: 2.5 },
-      { type: "lava_crystal", x: 143.0, y: 0, dir: "up" },
+      { type: "spike",  x: 242.0, y: 0, dir: "up" },
+      { type: "shield", x: 250.0, y: 2.5 },
+      { type: "lava_crystal", x: 260.0, y: 0, dir: "up" },
 
       // Crypt Chandelier Launch & High Crypt Rafters
-      { type: "pad",    x: 152.0, y: 0, subType: "yellow" },
-      { type: "block",  x: 156.0, y: 0, w: 12.0, h: 2.5 },
-      { type: "spike",  x: 165.0, y: 2.5, dir: "up" },
+      { type: "pad",    x: 274.0, y: 0, subType: "yellow" },
+      { type: "block",  x: 280.0, y: 0, w: 16.0, h: 2.5 },
+      { type: "spike",  x: 292.0, y: 2.5, dir: "up" },
 
       // Blood Orb Chains across Magma Rift
-      { type: "lava",   x: 172.0, y: 0, w: 16.0, h: 0.8 },
-      { type: "orb",    x: 176.0, y: 3.0, subType: "yellow" },
-      { type: "orb",    x: 183.0, y: 3.5, subType: "yellow" },
-      { type: "gem",    x: 183.0, y: 5.2, subType: "ruby", color: 0xc41230, value: 100 },
-      { type: "lava_crust", x: 190.0, y: 0, w: 8.0, h: 2.0 },
+      { type: "lava",   x: 304.0, y: 0, w: 18.0, h: 0.8 },
+      { type: "orb",    x: 310.0, y: 3.2, subType: "yellow" },
+      { type: "orb",    x: 320.0, y: 3.8, subType: "yellow" },
+      { type: "gem",    x: 320.0, y: 5.4, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "lava_crust", x: 328.0, y: 0, w: 12.0, h: 2.0 },
+
+      // 🚩 CHECKPOINT 2: GRAND BELFRY ATRIUM
+      { type: "checkpoint", x: 360.0, y: 0, respawnY: 0, title: "Grand Belfry Approach" },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT III: GRAND BELFRY DROP & ORGAN SOLO (x: 210 – 300)
+      // ACT III: GRAND BELFRY DROP & ORGAN SOLO (x: 360 – 550)
       // ═════════════════════════════════════════════════════════════════
       // 🌪️ Castle Belfry Aero Fan Launch (Drop / Organ Solo!)
-      { type: "fan",    x: 204.0, y: 2.0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
+      { type: "fan",    x: 374.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
       // Stepped Belfry Descent
-      { type: "stairs", x: 216.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
+      { type: "stairs", x: 392.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
 
       // Flying Belfry Stepped Pyramids
-      { type: "stairs", x: 228.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
-      { type: "block",  x: 231.6, y: 0, w: 6.0, h: 1.5 },
-      { type: "orb",    x: 242.0, y: 3.2, subType: "yellow" },
-      { type: "lava_crystal", x: 241.0, y: 0, dir: "up" },
-      { type: "block",  x: 246.0, y: 0, w: 6.0, h: 1.5 },
+      { type: "stairs", x: 418.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
+      { type: "block",  x: 421.6, y: 0, w: 8.0, h: 1.5 },
+      { type: "orb",    x: 434.0, y: 3.4, subType: "yellow" },
+      { type: "lava_crystal", x: 433.0, y: 0, dir: "up" },
+      { type: "block",  x: 440.0, y: 0, w: 8.0, h: 1.5 },
 
-      // High Gothic Spires into Speed Gate 2x
-      { type: "lava_crystal", x: 258.0, y: 0, dir: "up" },
-      { type: "speed_gate",   x: 266.0, y: 0, speedMult: 2.0 },
-      { type: "pad",    x: 272.0, y: 0, subType: "yellow" },
-      { type: "block",  x: 277.0, y: 0, w: 7.0, h: 2.5 },
-      { type: "gem",    x: 280.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
-      { type: "spike",  x: 286.0, y: 0, dir: "up" },
-      { type: "block",  x: 290.0, y: 0, w: 6.0, h: 1.5 },
+      // High Gothic Spires into Speed Gate 2x (Pipe Organ Solo!)
+      { type: "lava_crystal", x: 456.0, y: 0, dir: "up" },
+      { type: "speed_gate",   x: 466.0, y: 0, speedMult: 2.0 },
+      { type: "pad",    x: 476.0, y: 0, subType: "yellow" },
+      { type: "block",  x: 483.0, y: 0, w: 12.0, h: 2.5 },
+      { type: "gem",    x: 488.0, y: 5.0, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "spike",  x: 498.0, y: 2.5, dir: "up" },
+      { type: "block",  x: 508.0, y: 0, w: 10.0, h: 1.5 },
+      { type: "lava_crystal", x: 524.0, y: 0, dir: "up" },
+
+      // 🚩 CHECKPOINT 3: TEMPEST BATTLEMENT GATE
+      { type: "checkpoint", x: 550.0, y: 0, respawnY: 0, title: "Tempest Ramparts Gate" },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT IV: LIGHTNING STORM RAMPARTS (x: 300 – 355)
+      // ACT IV: LIGHTNING STORM RAMPARTS (x: 550 – 705)
       // ═════════════════════════════════════════════════════════════════
       // 🪜 Throne Room Grand Stairs
-      { type: "stairs", x: 308.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
-      { type: "block",  x: 312.8, y: 0, w: 7.0, h: 2.0 },
-      { type: "spike",  x: 318.0, y: 2.0, dir: "up" },
+      { type: "stairs", x: 566.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
+      { type: "block",  x: 571.0, y: 0, w: 10.0, h: 2.0 },
+      { type: "spike",  x: 578.0, y: 2.0, dir: "up" },
 
       // 🌪️ Final Royal Brimstone Aero Fan over Boiling Lava River
-      { type: "fan",    x: 326.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
-      { type: "lava",   x: 329.0, y: 0, w: 14.0, h: 0.8 },
-      { type: "lava_crust", x: 343.0, y: 0, w: 10.0, h: 1.5 },
+      { type: "fan",    x: 606.0, y: 0, w: 3.2, height: 9.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
+      { type: "lava",   x: 610.0, y: 0, w: 22.0, h: 0.8 },
+      { type: "orb",    x: 624.0, y: 5.5, subType: "yellow" },
+      { type: "gem",    x: 624.0, y: 6.8, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "lava_crust", x: 636.0, y: 0, w: 14.0, h: 1.8 },
+      { type: "shield", x: 658.0, y: 2.8 },
+      { type: "spike",  x: 672.0, y: 0, dir: "up" },
+      { type: "spike",  x: 686.0, y: 0, dir: "up" },
+
+      // 🚩 CHECKPOINT 4: INNER SANCTUARY PORTAL
+      { type: "checkpoint", x: 705.0, y: 0, respawnY: 0, title: "Collapsing Sanctuary Portal" },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT V: THE COLLAPSING SANCTUARY & UNSTABLE ESCAPE (x: 355 – 420)
+      // ACT V: THE COLLAPSING SANCTUARY & UNSTABLE ESCAPE (x: 705 – 840)
       // ═════════════════════════════════════════════════════════════════
       // Spires toppling, stone debris raining, platforms trembling!
-      { type: "block",  x: 356.0, y: 0, w: 7.0, h: 1.5, unstable: true },
-      { type: "spike",  x: 361.0, y: 1.5, dir: "up" },
-      { type: "pad",    x: 364.0, y: 0, subType: "yellow" },
-      { type: "block",  x: 368.0, y: 2.0, w: 9.0, h: 1.5, unstable: true },
-      { type: "gem",    x: 372.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
-      { type: "spike",  x: 375.0, y: 3.5, dir: "up" },
-      { type: "lava",   x: 378.0, y: 0, w: 14.0, h: 0.8 },
-      { type: "orb",    x: 382.0, y: 4.0, subType: "yellow" },
-      { type: "block",  x: 386.0, y: 1.8, w: 8.0, h: 1.5, unstable: true },
-      { type: "pad",    x: 391.0, y: 3.3, subType: "yellow" },
-      { type: "block",  x: 396.0, y: 3.6, w: 8.0, h: 1.2, unstable: true },
-      { type: "stairs", x: 405.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
-      { type: "block",  x: 410.0, y: 0, w: 9.0, h: 1.5, unstable: true }
-      // The Grand Ruined Sanctuary Gate & Time Freeze awaits at endX: 420!
+      { type: "block",  x: 720.0, y: 0, w: 10.0, h: 1.5, unstable: true },
+      { type: "spike",  x: 726.0, y: 1.5, dir: "up" },
+      { type: "pad",    x: 732.0, y: 0, subType: "yellow" },
+      { type: "block",  x: 742.0, y: 2.0, w: 12.0, h: 1.5, unstable: true },
+      { type: "gem",    x: 748.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "spike",  x: 751.0, y: 3.5, dir: "up" },
+      { type: "lava",   x: 758.0, y: 0, w: 16.0, h: 0.8 },
+      { type: "orb",    x: 766.0, y: 4.2, subType: "yellow" },
+      { type: "block",  x: 775.0, y: 1.8, w: 10.0, h: 1.5, unstable: true },
+      { type: "pad",    x: 786.0, y: 3.3, subType: "yellow" },
+      { type: "block",  x: 796.0, y: 3.6, w: 10.0, h: 1.5, unstable: true },
+      { type: "stairs", x: 810.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
+      { type: "block",  x: 820.0, y: 0, w: 14.0, h: 1.5, unstable: true }
+      // The Grand Ruined Sanctuary Gate & Time Freeze awaits at endX: 840!
     ]
   },
 
@@ -142,6 +162,7 @@ export const LEVEL_DATA = [
     bpm: 128,
     theme: 2,
     speed: 10.2,
+    ceilY: 9.0,
     endX: 390,
     defaultVehicle: "cube",
     desc: "Enchanted dream kingdom! Rainbow crystal stairs, celestial blossom aero fans, bubbling pastel magma pools, and emerald gems.",
@@ -169,6 +190,9 @@ export const LEVEL_DATA = [
       // Floor Y=0, Ceiling Y=9.0
       { type: "pad",    x: 74.0, y: 0, subType: "blue" }, // Launches smoothly up to pastel sky canopy!
 
+      // 🚩 CHECKPOINT 1: CANOPY APPROACH
+      { type: "checkpoint", x: 80.0, y: 0, title: "Canopy Approach Portal" },
+
       // ═════════════════════════════════════════════════════════════════
       // ACT II: INVERTED STARRY CANOPY (x: 80 – 170)
       // ═════════════════════════════════════════════════════════════════
@@ -191,6 +215,9 @@ export const LEVEL_DATA = [
       { type: "pad",    x: 152.0, y: 9, subType: "blue" },
       // 🌋 Active fairy magma bubble block on floor drop
       { type: "lava_bubble", x: 166.0, y: 0, w: 2.2, h: 1.4 },
+
+      // 🚩 CHECKPOINT 2: FAIRY QUEEN'S MEADOW GATE
+      { type: "checkpoint", x: 172.0, y: 0, title: "Fairy Queen's Meadow Gate" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT III: FAIRY QUEEN'S MEADOW & UFO FLIGHT (x: 170 – 300)
@@ -216,6 +243,9 @@ export const LEVEL_DATA = [
       { type: "spike",  x: 262.0, y: 0, dir: "up" },
       { type: "spike",  x: 262.0, y: 9, dir: "down" },
       { type: "portal", x: 275.0, y: 3.5, subType: "cube" },
+
+      // 🚩 CHECKPOINT 3: STARLIGHT MEADOW GATE
+      { type: "checkpoint", x: 280.0, y: 0, title: "Starlight Meadow Gate" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT IV: STARLIGHT MEADOW SPRINT (x: 300 – 390)
@@ -243,6 +273,7 @@ export const LEVEL_DATA = [
     bpm: 135,
     theme: 3,
     speed: 10.8,
+    ceilY: 10.0,
     endX: 450,
     defaultVehicle: "cube",
     desc: "Deep ocean trench! Sunken Atlantean temple stairs, boiling hydrothermal vent aero fans, abyssal volcanic trenches, and submarine flight.",
@@ -259,6 +290,9 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 31.0, y: 0, w: 3.2, height: 8.5, liftForce: 120.0, maxLiftVy: 17.5, subType: "turbo" },
       // --- SUBMARINE JET PORTAL (GREEN) ---
       { type: "portal", x: 38.0, y: 3.0, subType: "ship" },
+
+      // 🚩 CHECKPOINT 1: CORAL CAVERN GATE
+      { type: "checkpoint", x: 64.0, y: 0, title: "Coral Cavern Portal" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT II: CORAL CAVERN & ABYSSAL VOLCANIC TRENCH (x: 60 – 200)
@@ -302,6 +336,9 @@ export const LEVEL_DATA = [
       { type: "spike",  x: 190.0, y: 10, dir: "down" },
       { type: "speed_gate", x: 196.0, y: 0, speedMult: 2.0 },
 
+      // 🚩 CHECKPOINT 2: ABYSSAL CHASM GATE
+      { type: "checkpoint", x: 198.0, y: 0, title: "Abyssal Chasm Gate" },
+
       // ═════════════════════════════════════════════════════════════════
       // ACT III: GOLD RUSH INVERTED FLIGHT & MEGALODON (x: 200 – 340)
       // ═════════════════════════════════════════════════════════════════
@@ -321,6 +358,9 @@ export const LEVEL_DATA = [
 
       // Cube Return Portal
       { type: "portal", x: 330.0, y: 4.0, subType: "cube" },
+
+      // 🚩 CHECKPOINT 3: SUNKEN TEMPLE SANCTUM
+      { type: "checkpoint", x: 334.0, y: 0, title: "Sunken Temple Sanctum" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT IV: SUNKEN TEMPLE VICTORY PYRAMID (x: 340 – 450)
@@ -347,6 +387,7 @@ export const LEVEL_DATA = [
     bpm: 152,
     theme: 4,
     speed: 12.0,
+    ceilY: 10.0,
     endX: 470,
     defaultVehicle: "cube",
     desc: "Supersonic neo-Tokyo cyberspace! Rhythmic cyber stairs, turbo aero fans, molten cyber plasma basins, and quantum wave zigzags.",
@@ -368,6 +409,9 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 43.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, subType: "turbo" },
       { type: "block",  x: 48.0, y: 0, w: 8.0, h: 3.5 },
       { type: "gem",    x: 52.0, y: 5.5, subType: "amethyst", color: 0xd500f9, value: 100 },
+
+      // 🚩 CHECKPOINT 1: QUANTUM WAVE GATEWAY
+      { type: "checkpoint", x: 55.0, y: 0, title: "Quantum Wave Gateway" },
 
       // Launch into First Quantum Wave Portal
       { type: "portal", x: 57.0, y: 4.0, subType: "wave" },
@@ -399,6 +443,9 @@ export const LEVEL_DATA = [
       // Cube Reversion Portal
       { type: "portal", x: 148.0, y: 4.0, subType: "cube" },
 
+      // 🚩 CHECKPOINT 2: CYBER PYRAMID DECK
+      { type: "checkpoint", x: 150.0, y: 0, title: "Cyber Pyramid Deck" },
+
       // ═════════════════════════════════════════════════════════════════
       // ACT III: CYBER STAIRWAYS & INVERTED GRAVITY DECK (x: 149 – 232)
       // ═════════════════════════════════════════════════════════════════
@@ -418,6 +465,9 @@ export const LEVEL_DATA = [
       { type: "gem",    x: 212.0, y: 7.5, subType: "amethyst", color: 0xd500f9, value: 100 },
       { type: "pad",    x: 222.0, y: 10.0, subType: "blue" }, // Flip back to floor!
 
+      // 🚩 CHECKPOINT 3: DUAL WAVE DROP GATE
+      { type: "checkpoint", x: 230.0, y: 0, title: "Dual Wave Drop Gate" },
+
       // ═════════════════════════════════════════════════════════════════
       // ACT IV: DEMON DROP DUAL WAVE CLIMAX (x: 232 – 285)
       // ═════════════════════════════════════════════════════════════════
@@ -432,6 +482,9 @@ export const LEVEL_DATA = [
 
       // Final Cube Victory Sprint
       { type: "portal", x: 280.0, y: 4.0, subType: "cube" },
+
+      // 🚩 CHECKPOINT 4: OVERPASS CATWALK GATE
+      { type: "checkpoint", x: 284.0, y: 0, title: "Overpass Catwalk Gate" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT V: GRAND CYBER VICTORY STAIRS & TURBINE OVERPASS (x: 286 – 470)
@@ -487,6 +540,7 @@ export const LEVEL_DATA = [
     theme: 4,
     speed: 12.0,
     baseSpeed: 12.0,
+    ceilY: 10.0,
     endX: 1520,
     hasBoss: true,
     bossTriggerX: 760,
@@ -514,6 +568,9 @@ export const LEVEL_DATA = [
       // 🌪️ Launch Aero Fan into First UFO Portal
       { type: "fan",    x: 84.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, subType: "turbo" },
       { type: "lava_crystal", x: 92.0, y: 0 },
+
+      // Checkpoint 1 Approach
+      { type: "checkpoint", x: 200.0, y: 0, title: "Neon Approach Gate" },
 
       // 🛸 UFO PORTAL: First Anti-Gravity Hop Flight Zone
       { type: "portal", x: 100.0, y: 3.5, subType: "ufo" },
@@ -566,6 +623,9 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 356.0, y: 0, w: 3.5, height: 8.5, liftForce: 125.0, subType: "turbo" },
       { type: "block",  x: 364.0, y: 0, w: 8.0, h: 1.5 },
 
+      // 🚩 CHECKPOINT 2: QUANTUM DESCENT GATE
+      { type: "checkpoint", x: 372.0, y: 0, title: "Quantum Descent Gate" },
+
       // ⚡ SPEED GATE 2x (Enters The Quantum Descent)
       { type: "speed_gate", x: 375.0, y: 0, speedMult: 2.0 },
 
@@ -614,6 +674,9 @@ export const LEVEL_DATA = [
       // 🌪️ High-Speed Booster Fan over Molten Conduit into 3x Gate
       { type: "fan",    x: 742.0, y: 0, w: 3.5, height: 8.5, liftForce: 130.0, subType: "turbo" },
       { type: "lava",   x: 746.0, y: 0, w: 10.0, h: 0.8 },
+
+      // 🚩 CHECKPOINT 3: V.E.X.O.R. ARENA GATE
+      { type: "checkpoint", x: 750.0, y: 0, title: "V.E.X.O.R. Arena Core" },
 
       // ⚡ SPEED GATE 3x (Overdrive into Boss Arena)
       { type: "speed_gate", x: 752.0, y: 0, speedMult: 3.0 },
@@ -682,6 +745,9 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 1198.0, y: 0, w: 3.5, height: 8.5, liftForce: 130.0, subType: "turbo" },
       { type: "lava",   x: 1206.0, y: 0, w: 14.0, h: 0.8 },
       { type: "lava_crystal", x: 1212.0, y: 0 },
+
+      // 🚩 CHECKPOINT 4: MELTDOWN ESCAPE PORTAL
+      { type: "checkpoint", x: 1228.0, y: 0, title: "Meltdown Escape Portal" },
 
       // ═════════════════════════════════════════════════════════════════
       // ACT IV: THE MELTDOWN ESCAPE & QUANTUM INDUCTOR WARP (x: 1220 – 1520)

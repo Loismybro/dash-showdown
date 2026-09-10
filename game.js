@@ -223,6 +223,8 @@ class GameManager {
       gothicClimaxOverlay: document.getElementById('gothic-climax-overlay'),
       gothicNextBtn: document.getElementById('gothic-next-btn'),
       gothicReplayBtn: document.getElementById('gothic-replay-btn'),
+      checkpointToast: document.getElementById('checkpoint-toast'),
+      checkpointToastTitle: document.getElementById('cp-toast-title'),
 
       // Brainrot Pop-Up
       brainrotPopup: document.getElementById('brainrot-popup'),
@@ -410,145 +412,277 @@ class GameManager {
     this.renderer.setupGhosts(this.ghostConfigs);
   }
 
-  resetPlayer(isFullReset = false) {
-    if (this.practiceMode && this.checkpoints.length > 0 && !isFullReset) {
-      // Respawn at last practice checkpoint
-      const cp = this.checkpoints[this.checkpoints.length - 1];
-      this.player.x = cp.x;
-      this.player.y = cp.y;
-      this.player.vy = cp.vy || 0;
-      this.player.rotationZ = cp.rotationZ || 0;
-      this.player.vehicleMode = cp.vehicleMode || "cube";
-      this.player.gravityDir = cp.gravityDir || 1;
-      this.player.isGrounded = false;
-      this.player.isAlive = true;
-      this.player.hasShield = !!cp.hasShield;
-      this.player.invulnerableTimer = 0;
-      const shieldInd = document.getElementById('player-shield-indicator');
-      if (shieldInd) shieldInd.style.display = this.player.hasShield ? 'block' : 'none';
+  // -------------------------------------------------------------
+  // 🚩 COMPREHENSIVE 7-STATE CHECKPOINT ENGINE & SAFE RESPAWN
+  // -------------------------------------------------------------
 
-      // Restore shield pickups based on checkpoint location
-      if (this.level && this.level.obstacles) {
-        this.level.obstacles.forEach(o => {
-          if (o.type === 'shield') {
-            o.collected = (o.x < cp.x && cp.hasShield);
-          }
-          if (o.unstable && o.x >= cp.x - 2) {
-            o._shaking = false;
-            o._fallen = false;
-            o._shakeTimer = 0;
-            if (this.renderer && this.renderer.unstableBlocks && this.renderer.unstableBlocks.has(o)) {
-              const entry = this.renderer.unstableBlocks.get(o);
-              entry.fallen = false;
-              entry.shaking = false;
-              entry.shakeTimer = 0;
-              entry.vy = 0;
-              entry.mesh.position.y = entry.initialY;
-              entry.mesh.position.x = entry.initialX;
-              entry.mesh.position.z = entry.initialZ;
-              entry.mesh.visible = true;
-            }
-          }
-        });
-        if (this.renderer && this.renderer.shieldPickupMeshes) {
-          this.renderer.shieldPickupMeshes.forEach(sp => {
-            const obs = sp.userData.obstacle;
-            const collected = obs ? !!obs.collected : false;
-            sp.userData.isCollected = collected;
-            sp.visible = !collected;
-          });
-        }
-      }
+  createCheckpointSnapshot(x = this.player.x, y = this.player.y) {
+    return {
+      x: x,
+      y: y,
+      vy: this.player.vy || 0,
+      vx: this.player.vx || this.level.speed,
+      speed: this.level.speed,
+      speedMult: this.currentSpeedMult || 1.0,
+      vehicleMode: this.player.vehicleMode || "cube",
+      rotationZ: this.player.rotationZ || 0,
+      isGrounded: !!this.player.isGrounded,
+      gravityDir: this.player.gravityDir || 1,
+      hasShield: !!this.player.hasShield,
+      score: this.styleSystem ? this.styleSystem.score : 0,
+      combo: this.styleSystem ? this.styleSystem.combo : 0,
+      multiplier: this.styleSystem ? this.styleSystem.multiplier : 1.0,
+      decayTimer: this.styleSystem ? this.styleSystem.decayTimer : 0,
+      rankIdx: this.styleSystem ? this.styleSystem.rankIdx : 0,
+      gemsCollected: Array.from(this.gemsCollected),
+      orbTriggered: Array.from(this.player.orbTriggered),
+      beatPosition: (audio && typeof audio.getBeatPosition === 'function') ? audio.getBeatPosition() : null
+    };
+  }
 
-      // Restore orbTriggered from checkpoint snapshot
-      this.player.orbTriggered = new Set(cp.orbTriggered || []);
+  restoreCheckpointSnapshot(cp) {
+    if (!cp) return;
 
+    // 1. Player Position
+    this.player.x = cp.x;
+    this.player.y = cp.y;
+
+    // 2. Velocity
+    this.player.vy = cp.vy || 0;
+    this.currentSpeedMult = cp.speedMult || 1.0;
+    if (cp.speed) this.level.speed = cp.speed;
+    this.player.vx = this.level.speed * this.currentSpeedMult;
+
+    // 3. Movement State
+    this.player.vehicleMode = cp.vehicleMode || "cube";
+    this.player.rotationZ = cp.rotationZ || 0;
+    this.player.isGrounded = !!cp.isGrounded;
+    this.player.isHolding = false;
+    this.player.isAlive = true;
+    this.player.hasShield = !!cp.hasShield;
+    this.player.invulnerableTimer = 1.0; // 1s grace period so you don't immediately die!
+
+    // 4. Gravity State
+    this.player.gravityDir = cp.gravityDir || 1;
+
+    // 5. Score
+    if (this.styleSystem && cp.score !== undefined) {
+      this.styleSystem.score = cp.score;
+    }
+    if (cp.gemsCollected) {
+      this.gemsCollected = new Set(cp.gemsCollected);
       this.updateGemHUD();
       if (this.renderer && this.renderer.resetGems) {
         this.renderer.resetGems(this.gemsCollected);
-      }
-    } else {
-      // Normal restart from beginning
-      this.gemsCollected.clear();
-      this.brainrotMilestones.clear();
-      this.updateGemHUD();
-      if (this.renderer && this.renderer.resetGems) {
-        this.renderer.resetGems(this.gemsCollected);
-      }
-      this.player.x = 0;
-      this.player.y = (this.level.defaultVehicle === "cube" ? 0 : 2);
-      this.currentSpeedMult = 1.0;
-      if (this.level.baseSpeed) {
-        this.level.speed = this.level.baseSpeed;
-      }
-      this.player.vx = this.level.speed;
-      this.player.vy = 0;
-      this.player.rotationZ = 0;
-      this.player.vehicleMode = this.level.defaultVehicle || "cube";
-      this.player.gravityDir = 1;
-      this.player.hasShield = false;
-      this.player.invulnerableTimer = 0;
-      this.player.isGrounded = true;
-      this.player.isAlive = true;
-      this.player.orbTriggered.clear();
-      audio.updateShipThrust(0);
-
-      // Reset Gothic Living Environment Freeze & Overlay
-      this.isTimeFrozen = false;
-      const gothicOverlay = document.getElementById('gothic-climax-overlay');
-      if (gothicOverlay) {
-        gothicOverlay.style.display = 'none';
-        document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
-        document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
-        document.getElementById('gothic-card-container')?.classList.remove('slam-active');
-      }
-      if (this.renderer && this.renderer.sceneryManager) {
-        this.renderer.sceneryManager.setFrozen(false);
-      }
-      if (this.renderer && this.renderer.resetUnstableBlocks) {
-        this.renderer.resetUnstableBlocks();
-      }
-
-      // Reset Style Meter
-      if (this.styleSystem) {
-        this.styleSystem.score = 0;
-        this.styleSystem.combo = 0;
-        this.styleSystem.multiplier = 1.0;
-        this.styleSystem.rankIdx = 0;
-        this.updateStyleHUD();
-      }
-
-      // Reset boss entity
-      if (this.bossManager) {
-        this.bossManager.reset();
-      }
-
-      // Reset shield pickups & unstable blocks
-      if (this.level && this.level.obstacles) {
-        this.level.obstacles.forEach(o => {
-          if (o.type === 'shield') o.collected = false;
-          if (o.unstable) {
-            o._shaking = false;
-            o._fallen = false;
-            o._shakeTimer = 0;
-          }
-        });
-      }
-      if (this.renderer && this.renderer.shieldPickupMeshes) {
-        this.renderer.shieldPickupMeshes.forEach(sp => {
-          sp.userData.isCollected = false;
-          sp.visible = true;
-        });
-      }
-
-      const shieldInd = document.getElementById('player-shield-indicator');
-      if (shieldInd) shieldInd.style.display = 'none';
-
-      // Ensure rhythm beat alignment on full track restart
-      if (isFullReset && this.level && this.level.bpm) {
-        audio.startMusic(this.level.bpm, this.level.theme);
       }
     }
+
+    // 6. Combo
+    if (this.styleSystem) {
+      if (cp.combo !== undefined) this.styleSystem.combo = cp.combo;
+      if (cp.multiplier !== undefined) this.styleSystem.multiplier = cp.multiplier;
+      if (cp.decayTimer !== undefined) this.styleSystem.decayTimer = cp.decayTimer;
+      if (cp.rankIdx !== undefined) this.styleSystem.rankIdx = cp.rankIdx;
+      this.updateStyleHUD();
+    }
+
+    // 7. Beat Position & Music Synchronization
+    if (cp.beatPosition && typeof audio.setBeatPosition === 'function') {
+      audio.setBeatPosition(cp.beatPosition.step, cp.beatPosition.bar, cp.beatPosition.trackProgression);
+      if (!audio.isPlaying && this.level && this.level.bpm) {
+        audio.startMusic(this.level.bpm, this.level.theme, cp.beatPosition.step, cp.beatPosition.bar);
+      }
+    } else if (this.level && this.level.bpm) {
+      const progRatio = Math.max(0, Math.min(1.0, this.player.x / this.level.endX));
+      audio.setTrackProgression(progRatio);
+    }
+
+    // Dismiss Gothic Living Environment Freeze & Overlay
+    this.isTimeFrozen = false;
+    const gothicOverlay = document.getElementById('gothic-climax-overlay');
+    if (gothicOverlay) {
+      gothicOverlay.style.display = 'none';
+      document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
+      document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
+      document.getElementById('gothic-card-container')?.classList.remove('slam-active');
+    }
+    if (this.renderer && this.renderer.sceneryManager) {
+      this.renderer.sceneryManager.setFrozen(false);
+    }
+
+    // Restore shield pickups based on checkpoint location
+    if (this.level && this.level.obstacles) {
+      this.level.obstacles.forEach(o => {
+        if (o.type === 'shield') {
+          o.collected = (o.x < cp.x && cp.hasShield);
+        }
+        if (o.unstable && o.x >= cp.x - 2) {
+          o._shaking = false;
+          o._fallen = false;
+          o._shakeTimer = 0;
+          if (this.renderer && this.renderer.unstableBlocks && this.renderer.unstableBlocks.has(o)) {
+            const entry = this.renderer.unstableBlocks.get(o);
+            entry.fallen = false;
+            entry.shaking = false;
+            entry.shakeTimer = 0;
+            entry.vy = 0;
+            entry.mesh.position.y = entry.initialY;
+            entry.mesh.position.x = entry.initialX;
+            entry.mesh.position.z = entry.initialZ;
+            entry.mesh.visible = true;
+          }
+        }
+      });
+      if (this.renderer && this.renderer.shieldPickupMeshes) {
+        this.renderer.shieldPickupMeshes.forEach(sp => {
+          const obs = sp.userData.obstacle;
+          const collected = obs ? !!obs.collected : false;
+          sp.userData.isCollected = collected;
+          sp.visible = !collected;
+        });
+      }
+    }
+
+    // Restore orbTriggered from checkpoint snapshot
+    this.player.orbTriggered = new Set(cp.orbTriggered || []);
+
+    const shieldInd = document.getElementById('player-shield-indicator');
+    if (shieldInd) shieldInd.style.display = this.player.hasShield ? 'block' : 'none';
+
+    this.jumpBufferTimer = 0;
+    this.coyoteTimer = 0;
+    this.player.z = 0;
+    this.coilProgress = 0;
+    this.coilTransitionTimer = 0;
+    this.gameState = 'PLAYING';
+  }
+
+  showCheckpointToast(title = "CHECKPOINT REACHED") {
+    if (this.dom.checkpointToast) {
+      if (this.dom.checkpointToastTitle) {
+        this.dom.checkpointToastTitle.textContent = title;
+      }
+      this.dom.checkpointToast.style.display = 'flex';
+      this.dom.checkpointToast.classList.remove('show');
+      void this.dom.checkpointToast.offsetWidth;
+      this.dom.checkpointToast.classList.add('show');
+      if (this.checkpointToastTimeout) clearTimeout(this.checkpointToastTimeout);
+      this.checkpointToastTimeout = setTimeout(() => {
+        if (this.dom.checkpointToast) {
+          this.dom.checkpointToast.classList.remove('show');
+          setTimeout(() => {
+            if (this.dom.checkpointToast && !this.dom.checkpointToast.classList.contains('show')) {
+              this.dom.checkpointToast.style.display = 'none';
+            }
+          }, 350);
+        }
+      }, 2200);
+    }
+  }
+
+  resetPlayer(isFullReset = false) {
+    if (isFullReset) {
+      this.attempts = 1;
+      this.checkpoints = [];
+      this.lastCheckpoint = null;
+    }
+
+    const cp = (this.practiceMode && this.checkpoints.length > 0)
+      ? this.checkpoints[this.checkpoints.length - 1]
+      : (!isFullReset ? this.lastCheckpoint : null);
+
+    if (cp && !isFullReset) {
+      this.attempts++;
+      this.restoreCheckpointSnapshot(cp);
+      this.updateHUDHeader();
+      return;
+    }
+
+    // Normal restart from beginning (x = 0)
+    this.gemsCollected.clear();
+    this.brainrotMilestones.clear();
+    this.updateGemHUD();
+    if (this.renderer && this.renderer.resetGems) {
+      this.renderer.resetGems(this.gemsCollected);
+    }
+    this.player.x = 0;
+    this.player.y = (this.level.defaultVehicle === "cube" ? 0 : 2);
+    this.currentSpeedMult = 1.0;
+    if (this.level.baseSpeed) {
+      this.level.speed = this.level.baseSpeed;
+    }
+    this.player.vx = this.level.speed;
+    this.player.vy = 0;
+    this.player.rotationZ = 0;
+    this.player.vehicleMode = this.level.defaultVehicle || "cube";
+    this.player.gravityDir = 1;
+    this.player.hasShield = false;
+    this.player.invulnerableTimer = 0;
+    this.player.isGrounded = true;
+    this.player.isAlive = true;
+    this.player.orbTriggered.clear();
+    audio.updateShipThrust(0);
+
+    // Initialize level starting checkpoint
+    this.lastCheckpoint = this.createCheckpointSnapshot(0, this.player.y);
+
+    // Reset Gothic Living Environment Freeze & Overlay
+    this.isTimeFrozen = false;
+    const gothicOverlay = document.getElementById('gothic-climax-overlay');
+    if (gothicOverlay) {
+      gothicOverlay.style.display = 'none';
+      document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
+      document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
+      document.getElementById('gothic-card-container')?.classList.remove('slam-active');
+    }
+    if (this.renderer && this.renderer.sceneryManager) {
+      this.renderer.sceneryManager.setFrozen(false);
+    }
+    if (this.renderer && this.renderer.resetUnstableBlocks) {
+      this.renderer.resetUnstableBlocks();
+    }
+
+    // Reset Style Meter
+    if (this.styleSystem) {
+      this.styleSystem.score = 0;
+      this.styleSystem.combo = 0;
+      this.styleSystem.multiplier = 1.0;
+      this.styleSystem.rankIdx = 0;
+      this.updateStyleHUD();
+    }
+
+    // Reset boss entity
+    if (this.bossManager) {
+      this.bossManager.reset();
+    }
+
+    // Reset shield pickups & unstable blocks
+    if (this.level && this.level.obstacles) {
+      this.level.obstacles.forEach(o => {
+        if (o.type === 'shield') o.collected = false;
+        if (o.type === 'checkpoint') o._passed = false;
+        if (o.unstable) {
+          o._shaking = false;
+          o._fallen = false;
+          o._shakeTimer = 0;
+        }
+      });
+    }
+    if (this.renderer && this.renderer.shieldPickupMeshes) {
+      this.renderer.shieldPickupMeshes.forEach(sp => {
+        sp.userData.isCollected = false;
+        sp.visible = true;
+      });
+    }
+
+    const shieldInd = document.getElementById('player-shield-indicator');
+    if (shieldInd) shieldInd.style.display = 'none';
+
+    // Ensure rhythm beat alignment on full track restart
+    if (isFullReset && this.level && this.level.bpm) {
+      audio.startMusic(this.level.bpm, this.level.theme, 0, 0);
+    }
+    this.updateHUDHeader();
     this.jumpBufferTimer = 0;
     this.coyoteTimer = 0;
     this.player.z = 0;
@@ -1541,19 +1675,11 @@ class GameManager {
 
   placeCheckpoint() {
     if (!this.practiceMode || !this.player.isAlive) return;
-    this.checkpoints.push({
-      x: this.player.x,
-      y: this.player.y,
-      vy: this.player.vy,
-      rotationZ: this.player.rotationZ,
-      vehicleMode: this.player.vehicleMode,
-      gravityDir: this.player.gravityDir,
-      hasShield: !!this.player.hasShield,
-      gems: Array.from(this.gemsCollected),
-      orbTriggered: Array.from(this.player.orbTriggered)
-    });
+    const snap = this.createCheckpointSnapshot(this.player.x, this.player.y);
+    this.checkpoints.push(snap);
     audio.playCheckpoint();
     this.renderer.renderCheckpoints(this.checkpoints);
+    this.showCheckpointToast("PRACTICE CHECKPOINT SET");
   }
 
   deleteCheckpoint() {
@@ -1687,6 +1813,10 @@ class GameManager {
   integratePlayerStep(dt) {
     const p = this.player;
 
+    // Record pre-step position for robust continuous collision resolution
+    p.prevX = p.x;
+    p.prevY = p.y;
+
     // Update timers
     if (p.isGrounded) {
       this.coyoteTimer = 0.09;
@@ -1809,7 +1939,7 @@ class GameManager {
     }
 
     // 4. World Boundary Collisions
-    const ceilY = (this.level.id === 2 ? 9.0 : 10.0);
+    const ceilY = (this.level && this.level.ceilY) ? this.level.ceilY : (this.level.id === 2 ? 9.0 : 22.0);
     const floorY = 0.0;
 
     if (p.gravityDir === 1) {
@@ -1859,6 +1989,20 @@ class GameManager {
       }
     }
 
+    // Dynamic Safe Ground Auto-Checkpoint (every ~40 units on flat safe floor)
+    if (!this.practiceMode && p.isGrounded && p.y <= 0.05 && p.vehicleMode === 'cube' && p.isAlive) {
+      const lastCpX = this.lastCheckpoint ? this.lastCheckpoint.x : 0;
+      if (p.x - lastCpX >= 42.0) {
+        const hasDangerAhead = this.level.obstacles.some(o => 
+          (o.type === 'spike' || o.type === 'lava' || o.type === 'lava_pit') && 
+          o.x >= p.x && o.x <= p.x + 6.0
+        );
+        if (!hasDangerAhead) {
+          this.lastCheckpoint = this.createCheckpointSnapshot(p.x, p.y);
+        }
+      }
+    }
+
     // 5. Obstacle Collisions
     this.checkObstacleCollisions();
   }
@@ -1873,34 +2017,54 @@ class GameManager {
 
       if (Math.abs(px - obs.x) > 6.0) continue;
 
-      if (obs.type === 'spike') {
-        const halfW = 0.36; // Generous inner deadly hitbox (forgiving GD tolerance)
+      if (obs.type === 'checkpoint') {
+        if (!obs._passed && px >= obs.x - 0.5 && px <= obs.x + 2.0) {
+          obs._passed = true;
+          this.lastCheckpoint = this.createCheckpointSnapshot(obs.x, obs.y || p.y);
+          if (this.renderer && this.renderer.triggerCheckpointEffect) {
+            this.renderer.triggerCheckpointEffect(obs.x, obs.y || p.y);
+          }
+          audio.playCheckpoint();
+          this.showCheckpointToast(obs.title || "CHECKPOINT REACHED");
+        }
+        continue;
+      }
+      else if (obs.type === 'spike') {
+        const halfW = 0.28; // Fair hitbox (GD standard forgiving inner hitbox)
         const dx = Math.abs(px - obs.x);
         if (dx < halfW) {
           const slopeRatio = (1.0 - dx / halfW);
           if (obs.dir === 'down') {
             // Hanging spike pointing DOWN: base at obs.y, tip at obs.y - 0.85
-            const deadlyY = obs.y - slopeRatio * 0.80;
-            const playerTop = p.y + 0.90;
-            const playerBottom = p.y + 0.05;
+            const deadlyY = obs.y - slopeRatio * 0.72;
+            const playerTop = p.y + 0.88;
+            const playerBottom = p.y + 0.12;
             // Player MUST be vertically within the spike's actual span!
-            if (playerTop > deadlyY && playerBottom < obs.y) {
-              this.onPlayerCrash();
-              return;
-            } else if (!obs.nearMiss && playerTop <= deadlyY && playerTop >= deadlyY - 0.22) {
+            if (playerTop > deadlyY && playerBottom < obs.y - 0.10) {
+              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                // Invulnerability grace
+              } else {
+                this.onPlayerCrash();
+                return;
+              }
+            } else if (!obs.nearMiss && playerTop <= deadlyY && playerTop >= deadlyY - 0.25) {
               obs.nearMiss = true;
               this.onNearMissSpike(obs.x, obs.y);
             }
           } else {
             // Floor spike pointing UP: base at obs.y, tip at obs.y + 0.85
-            const deadlyY = obs.y + slopeRatio * 0.80;
-            const playerTop = p.y + 0.95;
-            const playerBottom = p.y + 0.05;
+            const deadlyY = obs.y + slopeRatio * 0.72;
+            const playerTop = p.y + 0.88;
+            const playerBottom = p.y + 0.12;
             // Player MUST be vertically within the spike's actual span!
-            if (playerBottom < deadlyY && playerTop > obs.y + 0.05) {
-              this.onPlayerCrash();
-              return;
-            } else if (!obs.nearMiss && playerBottom >= deadlyY && playerBottom <= deadlyY + 0.22) {
+            if (playerBottom < deadlyY && playerTop > obs.y + 0.10) {
+              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+                // Invulnerability grace
+              } else {
+                this.onPlayerCrash();
+                return;
+              }
+            } else if (!obs.nearMiss && playerBottom >= deadlyY && playerBottom <= deadlyY + 0.25) {
               obs.nearMiss = true;
               this.onNearMissSpike(obs.x, obs.y);
             }
@@ -1919,89 +2083,110 @@ class GameManager {
         const bottom = by;
         const top = by + bh;
 
-        const playerLeft = px - 0.36;
-        const playerRight = px + 0.36;
+        const playerHalfW = 0.36;
+        const playerLeft = px - playerHalfW;
+        const playerRight = px + playerHalfW;
         const playerBottom = p.y;
         const playerTop = p.y + 1.0;
 
-        if (playerRight > left + 0.05 && playerLeft < right - 0.05 && playerTop > bottom + 0.05 && playerBottom < top - 0.02) {
+        if (playerRight > left + 0.04 && playerLeft < right - 0.04 && playerTop > bottom + 0.04 && playerBottom < top - 0.02) {
+          if (p.invulnerableTimer && p.invulnerableTimer > 0) {
+            p.y = (p.gravityDir === 1 ? top : bottom - 1.0);
+            p.vy = 0;
+            p.isGrounded = true;
+            continue;
+          }
+
           if (p.vehicleMode === 'cube') {
             if (p.gravityDir === 1) {
-              if (playerBottom >= top - 0.45) {
-                if (p.vy <= 0.5) {
-                  if (!p.isGrounded) {
-                    audio.playMechanicalLanding();
-                    this.renderer.triggerLandingSquash();
-                  }
-                  p.y = top;
-                  p.vy = 0;
-                  p.isGrounded = true;
-                  if (obs.unstable && !obs._shaking && !obs._fallen) {
-                    obs._shaking = true;
-                    obs._shakeTimer = 0.38;
-                    if (this.renderer) {
-                      this.renderer.shakeUnstableBlock(obs, 0.38);
-                    }
-                  }
+              // 1. Top Landing Priority (always land on top if coming from above or near top edge)
+              const isComingFromAbove = (p.prevY >= top - 0.28) || (p.y >= top - 0.45);
+              if (isComingFromAbove) {
+                if (!p.isGrounded) {
+                  audio.playMechanicalLanding();
+                  this.renderer.triggerLandingSquash();
                 }
-              } else {
-                const isInternalSeam = this.level.obstacles.some(o => 
-                  o.type === 'block' && o !== obs && 
-                  Math.abs((o.x + (o.w || 2)) - left) < 0.15 && 
-                  Math.abs((o.y + (o.h || 2)) - top) < 0.15
-                );
-                if (!isInternalSeam) {
-                  if (p.invulnerableTimer && p.invulnerableTimer > 0) {
-                    p.y = top;
-                    p.vy = 0;
-                    p.isGrounded = true;
-                  } else {
-                    this.onPlayerCrash();
-                    return;
-                  }
-                }
-              }
-            }
-            else if (p.gravityDir === -1) {
-              if (playerTop <= bottom + 0.45) {
-                if (p.vy >= -0.5) {
-                  if (!p.isGrounded) {
-                    audio.playMechanicalLanding();
-                    this.renderer.triggerLandingSquash();
-                  }
-                  p.y = bottom - 1.0;
-                  p.vy = 0;
-                  p.isGrounded = true;
-                }
-              } else {
-                const isInternalSeam = this.level.obstacles.some(o => 
-                  o.type === 'block' && o !== obs && 
-                  Math.abs((o.x + (o.w || 2)) - left) < 0.15 && 
-                  Math.abs(o.y - bottom) < 0.15
-                );
-                if (!isInternalSeam) {
-                  if (p.invulnerableTimer && p.invulnerableTimer > 0) {
-                    p.y = bottom - 1.0;
-                    p.vy = 0;
-                    p.isGrounded = true;
-                  } else {
-                    this.onPlayerCrash();
-                    return;
-                  }
-                }
-              }
-            } else {
-              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
                 p.y = top;
                 p.vy = 0;
                 p.isGrounded = true;
-              } else {
+                if (obs.unstable && !obs._shaking && !obs._fallen) {
+                  obs._shaking = true;
+                  obs._shakeTimer = 0.38;
+                  if (this.renderer) {
+                    this.renderer.shakeUnstableBlock(obs, 0.38);
+                  }
+                }
+                continue;
+              }
+
+              // 2. Head bump under floating block (bounce downwards, never crash)
+              const isHittingUnderside = (p.prevY + 1.0 <= bottom + 0.28) || (p.y + 1.0 <= bottom + 0.35);
+              if (isHittingUnderside && p.vy > 0) {
+                p.y = bottom - 1.0;
+                p.vy = Math.min(0, p.vy);
+                continue;
+              }
+
+              // 3. Seam between consecutive contiguous blocks
+              const isInternalSeam = this.level.obstacles.some(o => 
+                o.type === 'block' && o !== obs && !o._fallen &&
+                Math.abs((o.x + (o.w || 2)) - left) < 0.20 && 
+                o.y <= bottom + 0.2 && (o.y + (o.h || 2)) >= top - 0.2
+              );
+              if (isInternalSeam) {
+                continue;
+              }
+
+              // 4. Genuine front crash into wall
+              if (p.prevX + playerHalfW <= left + 0.25) {
                 this.onPlayerCrash();
                 return;
+              } else {
+                p.y = top;
+                p.vy = 0;
+                p.isGrounded = true;
+              }
+            } else {
+              // Inverted gravity
+              const isComingFromBelow = (p.prevY + 1.0 <= bottom + 0.28) || (p.y + 1.0 <= bottom + 0.45);
+              if (isComingFromBelow) {
+                if (!p.isGrounded) {
+                  audio.playMechanicalLanding();
+                  this.renderer.triggerLandingSquash();
+                }
+                p.y = bottom - 1.0;
+                p.vy = 0;
+                p.isGrounded = true;
+                continue;
+              }
+
+              const isHittingTop = (p.prevY >= top - 0.28) || (p.y >= top - 0.35);
+              if (isHittingTop && p.vy < 0) {
+                p.y = top;
+                p.vy = Math.max(0, p.vy);
+                continue;
+              }
+
+              const isInternalSeam = this.level.obstacles.some(o => 
+                o.type === 'block' && o !== obs && !o._fallen &&
+                Math.abs((o.x + (o.w || 2)) - left) < 0.20 && 
+                o.y <= bottom + 0.2 && (o.y + (o.h || 2)) >= top - 0.2
+              );
+              if (isInternalSeam) {
+                continue;
+              }
+
+              if (p.prevX + playerHalfW <= left + 0.25) {
+                this.onPlayerCrash();
+                return;
+              } else {
+                p.y = bottom - 1.0;
+                p.vy = 0;
+                p.isGrounded = true;
               }
             }
           } else if (p.vehicleMode === 'ship' || p.vehicleMode === 'ufo') {
-            if (p.gravityDir === 1 && playerBottom >= top - 0.45) {
+            if (p.gravityDir === 1 && (p.prevY >= top - 0.32 || playerBottom >= top - 0.45)) {
               p.y = top;
               p.vy = Math.max(0, p.vy);
               p.isGrounded = true;
@@ -2012,30 +2197,24 @@ class GameManager {
                   this.renderer.shakeUnstableBlock(obs, 0.38);
                 }
               }
-            } else if (p.gravityDir === -1 && playerTop <= bottom + 0.45) {
+            } else if (p.gravityDir === -1 && (p.prevY + 1.0 <= bottom + 0.32 || playerTop <= bottom + 0.45)) {
               p.y = bottom - 1.0;
               p.vy = Math.min(0, p.vy);
               p.isGrounded = true;
             } else {
-              if (p.invulnerableTimer && p.invulnerableTimer > 0) {
-                if (p.gravityDir === 1) p.y = top;
-                else p.y = bottom - 1.0;
-                p.vy = 0;
-                p.isGrounded = true;
-              } else {
+              if (p.prevX + playerHalfW <= left + 0.22) {
                 this.onPlayerCrash();
                 return;
+              } else {
+                p.y = p.gravityDir === 1 ? top : bottom - 1.0;
+                p.vy = 0;
+                p.isGrounded = true;
               }
             }
           } else {
-            if (p.invulnerableTimer && p.invulnerableTimer > 0) {
-              p.y = top;
-              p.vy = 0;
-              p.isGrounded = true;
-            } else {
-              this.onPlayerCrash();
-              return;
-            }
+            // Wave mode
+            this.onPlayerCrash();
+            return;
           }
         }
       }
@@ -2060,26 +2239,28 @@ class GameManager {
 
           if (p.gravityDir === 1) {
             // Smooth step climb & tread landing
-            if (p.y >= Math.min(prevStepTop, stepTop) - 0.32 && p.y <= Math.max(prevStepTop, stepTop) + 0.38 && p.vy <= 2.2) {
+            if (p.y >= Math.min(prevStepTop, stepTop) - 0.55 && p.y <= Math.max(prevStepTop, stepTop) + 0.50) {
               if (!p.isGrounded) {
                 audio.playMechanicalLanding();
                 this.renderer.triggerLandingSquash();
-              } else if (Math.abs(p.y - stepTop) > 0.12) {
+              } else if (Math.abs(p.y - stepTop) > 0.08) {
                 audio.playStairStep(1.0 + stepIdx * 0.08);
               }
               p.y = stepTop;
               p.vy = 0;
               p.isGrounded = true;
-            } else if (px > sx + 0.12 && p.y < stepTop - 0.45 && p.y > sy - 0.2) {
-              this.onPlayerCrash();
-              return;
+            } else if (px > sx + 0.12 && p.y < stepTop - 0.60 && p.y > sy - 0.3) {
+              if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
+                this.onPlayerCrash();
+                return;
+              }
             }
           } else {
             // Inverted gravity stair climbing
             const invTop = (dir === 'down')
               ? sy - (numSteps - stepIdx) * stepH
               : sy - (stepIdx + 1) * stepH;
-            if (p.y <= invTop + 0.35 && p.vy >= -2.2) {
+            if (p.y <= invTop + 0.50) {
               p.y = invTop - 1.0;
               p.vy = 0;
               p.isGrounded = true;
@@ -2145,13 +2326,15 @@ class GameManager {
         const left = obs.x;
         const right = obs.x + cw;
         const top = obs.y + ch;
-        const playerLeft = px - 0.36;
-        const playerRight = px + 0.36;
+        const playerHalfW = 0.36;
+        const playerLeft = px - playerHalfW;
+        const playerRight = px + playerHalfW;
         const playerBottom = p.y;
         const playerTop = p.y + 1.0;
 
-        if (playerRight > left + 0.05 && playerLeft < right - 0.05 && playerTop > obs.y + 0.05 && playerBottom < top - 0.02) {
-          if (playerBottom >= top - 0.45 && p.vy <= 0.5) {
+        if (playerRight > left + 0.04 && playerLeft < right - 0.04 && playerTop > obs.y + 0.04 && playerBottom < top - 0.02) {
+          const isComingFromAbove = (p.prevY >= top - 0.28) || (p.y >= top - 0.45);
+          if (isComingFromAbove || (p.invulnerableTimer && p.invulnerableTimer > 0)) {
             if (!p.isGrounded) {
               audio.playMechanicalLanding();
               this.renderer.triggerLandingSquash();
@@ -2159,9 +2342,13 @@ class GameManager {
             p.y = top;
             p.vy = 0;
             p.isGrounded = true;
-          } else {
-            this.onPlayerCrash();
+          } else if (p.prevX + playerHalfW <= left + 0.22) {
+            this.onPlayerCrash('lava');
             return;
+          } else {
+            p.y = top;
+            p.vy = 0;
+            p.isGrounded = true;
           }
         }
       }
