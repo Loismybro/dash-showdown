@@ -23,8 +23,9 @@ class AudioManager {
     this.musicGain = null;
     this.sfxGain = null;
 
-    // Current track theme
+    // Current track theme and progression
     this.trackTheme = 1;
+    this.trackProgression = 0;
     this.isGoldRush = false;
 
     // Waveshaper distortion curve for brass growl and taiko punch
@@ -46,6 +47,10 @@ class AudioManager {
     this.pendingBuffers = {};
     this.activeSmurfAudio = null;
     this.preloadMemeAudio();
+  }
+
+  setTrackProgression(prog) {
+    this.trackProgression = Math.max(0, Math.min(1.0, prog || 0));
   }
 
   init() {
@@ -201,6 +206,12 @@ class AudioManager {
     this.stopShipHum();
 
     this.nextNoteTime = this.ctx.currentTime + 0.05;
+    if (this.musicGain && this.ctx) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.setValueAtTime(this.musicVolume !== undefined ? this.musicVolume : 0.8, this.ctx.currentTime);
+      } catch (e) {}
+    }
     if (this.timerID) clearInterval(this.timerID);
     this.timerID = setInterval(() => this.scheduler(), this.lookahead);
   }
@@ -212,6 +223,23 @@ class AudioManager {
       this.timerID = null;
     }
     this.stopShipHum();
+  }
+
+  // Abrupt dead-stop silence for dramatic climax freeze
+  cutMusicInstant() {
+    this.stopMusic();
+    if (this.musicGain && this.ctx) {
+      try {
+        this.musicGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.musicGain.gain.setValueAtTime(0.00001, this.ctx.currentTime);
+      } catch (e) {}
+    }
+    if (this.thrusterMasterGain && this.ctx) {
+      try {
+        this.thrusterMasterGain.gain.cancelScheduledValues(this.ctx.currentTime);
+        this.thrusterMasterGain.gain.setValueAtTime(0.00001, this.ctx.currentTime);
+      } catch (e) {}
+    }
   }
 
   pauseMusic() {
@@ -339,21 +367,75 @@ class AudioManager {
     }
   }
 
-  // ── 🏰 GOTHIC CASTLE SCHEDULER ──
+  // ── 🏰 GOTHIC CASTLE SCHEDULER (Dynamic 5-Act Living Environment) ──
   scheduleGothicStep(step, bar, time, scale, chordIndex, isDrop) {
     const isQuarter = (step % 4 === 0);
+    const prog = this.trackProgression || 0;
 
-    // Ominous Church Funeral Bell on Bar 0 and Bar 4 downbeat
+    // Phase 1: Beginning (prog < 0.22) - Quiet castle, cold ambience, sparse organ
+    if (prog < 0.22) {
+      if (bar === 0 && step === 0) {
+        this.playChurchBell(time);
+      }
+      // Very soft single timpani pulse on bar 0 & 4 downbeats
+      if ((bar === 0 || bar === 4) && step === 0) {
+        this.playCinematicTaiko(time, 0.45);
+      }
+      // Sparse lingering gothic organ chord on step 0
+      if (step === 0) {
+        const chord = scale.fanfareChords[chordIndex];
+        this.playGothicOrganChord(time, chord, 1.25, 0.16);
+      }
+      // Keep completely quiet otherwise - rain and wind will dominate
+      return;
+    }
+
+    // Phase 2: Build-up (0.22 <= prog < 0.45) - Torches ignite, tension mounts
+    if (prog < 0.45) {
+      if ((bar === 0 || bar === 4) && step === 0) {
+        this.playChurchBell(time);
+      }
+      // Timpani marching kick on 0 and 8
+      if (step === 0 || step === 8) {
+        this.playCinematicTaiko(time, 0.72);
+      }
+      // Snare rimshot on 4 & 12
+      if (step === 4 || step === 12) {
+        this.playSynthSnare(time, 0.45);
+      }
+      // Gentle hat shiver
+      this.playActionHat(time, step % 4 === 2, 0.18);
+      // Organ chords on 0 and 6
+      if (step === 0 || step === 6) {
+        const chord = scale.fanfareChords[chordIndex];
+        this.playGothicOrganChord(time, chord, 0.65, 0.24);
+      }
+      // Subdued bass
+      if (step === 0 || step === 8) {
+        this.playGoldRushSynthBass(time, scale.bassNotes[chordIndex], true, false);
+      }
+      // Building lead arpeggio on quarter notes
+      if (isQuarter) {
+        const notes = scale.leadScale;
+        const noteIdx = (Math.floor(step / 4) + bar) % notes.length;
+        this.playLeadPluck(time, notes[noteIdx], 0.2);
+      }
+      return;
+    }
+
+    // Phase 3 & Beyond: The Drop (prog >= 0.45), Lightning (prog >= 0.68), Collapse (prog >= 0.85)
+    // Church Funeral Bell on Bar 0 and Bar 4 downbeat
     if ((bar === 0 || bar === 4) && step === 0) {
       this.playChurchBell(time);
     }
 
     // Heavy Timpani & Gothic Sub Kick
     let playKick = false;
-    let kickVol = 0.9;
-    if (isDrop) {
+    let kickVol = 0.95;
+    const isFullDrop = isDrop || prog >= 0.45;
+    if (isFullDrop) {
       if (isQuarter) { playKick = true; kickVol = 1.0; }
-      else if (step === 14) { playKick = true; kickVol = 0.8; }
+      else if (step === 14) { playKick = true; kickVol = 0.85; }
     } else {
       if (step === 0 || step === 8) { playKick = true; kickVol = 0.85; }
       else if (bar % 2 === 1 && step === 14) { playKick = true; kickVol = 0.7; }
@@ -362,22 +444,22 @@ class AudioManager {
 
     // Gothic Snare / Rimshot on 4 & 12
     if (step === 4 || step === 12) {
-      this.playSynthSnare(time, isDrop ? 0.7 : 0.5);
+      this.playSynthSnare(time, isFullDrop ? 0.75 : 0.5);
     }
 
     // High Hat Shiver
-    this.playActionHat(time, step % 4 === 2, isDrop ? 0.35 : 0.2);
+    this.playActionHat(time, step % 4 === 2, isFullDrop ? 0.38 : 0.22);
 
     // Church Pipe Organ Chords on downbeats and syncopations
-    if (step === 0 || step === 6 || (step === 12 && isDrop)) {
+    if (step === 0 || step === 6 || (step === 12 && isFullDrop)) {
       const chord = scale.fanfareChords[chordIndex];
-      this.playGothicOrganChord(time, chord, isDrop ? 0.38 : 0.65, isDrop ? 0.32 : 0.26);
+      this.playGothicOrganChord(time, chord, isFullDrop ? 0.38 : 0.65, isFullDrop ? 0.35 : 0.26);
     }
 
     // Minor Bass
     const bassFreq = scale.bassNotes[chordIndex];
-    if (step % 2 === 0 || isDrop) {
-      this.playGoldRushSynthBass(time, bassFreq, step === 0 || step === 8, isDrop);
+    if (step % 2 === 0 || isFullDrop) {
+      this.playGoldRushSynthBass(time, bassFreq, step === 0 || step === 8, isFullDrop);
     }
 
     // Haunting Gothic Minor Organ Solo / Arpeggio
@@ -385,7 +467,12 @@ class AudioManager {
       const notes = scale.leadScale;
       const pattern = [0, 2, 4, 7, 5, 4, 2, 0, 3, 5, 6, 7, 6, 4, 2, 0];
       const noteIdx = (pattern[step] + (bar * 2)) % notes.length;
-      this.playLeadPluck(time, notes[noteIdx], isDrop ? 0.32 : 0.22);
+      this.playLeadPluck(time, notes[noteIdx], isFullDrop ? 0.35 : 0.22);
+    }
+
+    // Phase 5 (Collapse): Subterranean earthquake rumbles
+    if (prog >= 0.85 && step === 0) {
+      this.playEarthquakeRumble(time);
     }
   }
 
@@ -940,6 +1027,128 @@ class AudioManager {
       osc2.start(now);
       osc1.stop(now + duration + 0.05);
       osc2.stop(now + duration + 0.05);
+    });
+  }
+
+  // ⚡ Gothic Lightning Thunderclap
+  playThunderClap(time) {
+    if (!this.ctx || this.muted) return;
+    const now = time || this.ctx.currentTime;
+
+    // 1. Transient High-Frequency Crack & Rumble
+    const bufferSize = Math.floor(this.ctx.sampleRate * 2.2);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = (Math.random() * 2 - 1) * (1 - i / bufferSize);
+    }
+    const noise = this.ctx.createBufferSource();
+    noise.buffer = noiseBuffer;
+
+    const filter = this.ctx.createBiquadFilter();
+    filter.type = 'lowpass';
+    filter.frequency.setValueAtTime(4200, now);
+    filter.frequency.exponentialRampToValueAtTime(160, now + 0.55);
+    filter.frequency.linearRampToValueAtTime(60, now + 2.0);
+
+    const gain = this.ctx.createGain();
+    gain.gain.setValueAtTime(0.95, now);
+    gain.gain.exponentialRampToValueAtTime(0.0001, now + 2.1);
+
+    noise.connect(filter);
+    filter.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    noise.start(now);
+    noise.stop(now + 2.2);
+
+    // 2. Sub-bass Thunder Body (Low rolling boom)
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sawtooth';
+    subOsc.frequency.setValueAtTime(75, now);
+    subOsc.frequency.exponentialRampToValueAtTime(28, now + 1.8);
+    subGain.gain.setValueAtTime(0.65, now);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.9);
+    subOsc.connect(subGain);
+    subGain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 2.0);
+  }
+
+  // 🌋 Subterranean Earthquake & Collapse Tremor
+  playEarthquakeRumble(time) {
+    if (!this.ctx || this.muted) return;
+    const now = time || this.ctx.currentTime;
+    const osc = this.ctx.createOscillator();
+    const gain = this.ctx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(44 + Math.random() * 12, now);
+    gain.gain.setValueAtTime(0.35, now);
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.65);
+    osc.connect(gain);
+    gain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    osc.start(now);
+    osc.stop(now + 0.7);
+  }
+
+  // 💥 APOCALYPTIC GOTHIC ENDING BOOM (Sub-bass Drop + Shatter + Cathedral Gong)
+  playGothicEndingBoom() {
+    this.init();
+    if (!this.ctx || this.muted) return;
+    const now = this.ctx.currentTime;
+
+    // 1. Massive 808 Sub-Bass Impact
+    const subOsc = this.ctx.createOscillator();
+    const subGain = this.ctx.createGain();
+    subOsc.type = 'sine';
+    subOsc.frequency.setValueAtTime(125, now);
+    subOsc.frequency.exponentialRampToValueAtTime(22, now + 2.2);
+    subGain.gain.setValueAtTime(1.0, now);
+    subGain.gain.exponentialRampToValueAtTime(0.0001, now + 2.8);
+    subOsc.connect(subGain);
+    subGain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    subOsc.start(now);
+    subOsc.stop(now + 2.9);
+
+    // 2. High-Energy Stone Shatter & Shockwave Noise Burst
+    const bufferSize = Math.floor(this.ctx.sampleRate * 1.8);
+    const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+    const data = noiseBuffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) {
+      data[i] = Math.random() * 2 - 1;
+    }
+    const whiteNoise = this.ctx.createBufferSource();
+    whiteNoise.buffer = noiseBuffer;
+
+    const noiseFilter = this.ctx.createBiquadFilter();
+    noiseFilter.type = 'lowpass';
+    noiseFilter.frequency.setValueAtTime(3600, now);
+    noiseFilter.frequency.exponentialRampToValueAtTime(160, now + 1.2);
+
+    const noiseGain = this.ctx.createGain();
+    noiseGain.gain.setValueAtTime(0.9, now);
+    noiseGain.gain.exponentialRampToValueAtTime(0.0001, now + 1.6);
+
+    whiteNoise.connect(noiseFilter);
+    noiseFilter.connect(noiseGain);
+    noiseGain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+    whiteNoise.start(now);
+    whiteNoise.stop(now + 1.7);
+
+    // 3. Cathedral Bell / Sub Gong Resonant Harmonics
+    const gongPartials = [65.41, 130.81, 196.00, 277.18];
+    gongPartials.forEach((freq, idx) => {
+      const gOsc = this.ctx.createOscillator();
+      const gGain = this.ctx.createGain();
+      gOsc.type = (idx === 0) ? 'sine' : 'triangle';
+      gOsc.frequency.setValueAtTime(freq, now);
+      const gVol = 0.4 / (idx + 1);
+      gGain.gain.setValueAtTime(gVol, now + 0.04);
+      gGain.gain.exponentialRampToValueAtTime(0.0001, now + 3.4);
+      gOsc.connect(gGain);
+      gGain.connect(this.sfxGain || this.masterGain || this.ctx.destination);
+      gOsc.start(now);
+      gOsc.stop(now + 3.5);
     });
   }
 
@@ -2226,4 +2435,7 @@ class AudioManager {
 }
 
 export const audio = new AudioManager();
+if (typeof window !== 'undefined') {
+  window.dashAudio = audio;
+}
 

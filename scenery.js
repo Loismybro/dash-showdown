@@ -1,8 +1,9 @@
 // scenery.js - High-End Procedural Parallax Scenery Engine for Dash Showdown
 
 export class SceneryManager {
-  constructor(scene) {
+  constructor(scene, renderer = null) {
     this.scene = scene;
+    this.renderer = renderer;
     this.currentLevelId = null;
 
     // Groups for parallax layers
@@ -51,6 +52,18 @@ export class SceneryManager {
     ];
     this.flashColor = null;
     this.flashIntensity = 0;
+    this.gothicLivingCastle = null;
+  }
+
+  setCinematicFreeze(frozen) {
+    this.isFrozen = frozen;
+    if (this.gothicLivingCastle) {
+      this.gothicLivingCastle.isFrozen = frozen;
+    }
+  }
+
+  setFrozen(frozen) {
+    this.setCinematicFreeze(frozen);
   }
 
   triggerObstacleFlash(colorHex = 0xffffff, intensity = 1.0) {
@@ -82,16 +95,14 @@ export class SceneryManager {
     const themeType = (this.currentLevel && this.currentLevel.themeType) || 
                       (this.currentLevelId === 1 ? 'gothic' : (this.currentLevelId === 2 ? 'fairyland' : (this.currentLevelId === 3 ? 'shark' : 'cyber')));
 
+    if (themeType === 'gothic') {
+      this.renderGothicLivingSky(ctx, W, H, progressRatio, time, delta);
+      return;
+    }
+
     // 4 Progressive Obstacle Zones per Theme
     let zones = [];
-    if (themeType === 'gothic') {
-      zones = [
-        { zenith: [14, 5, 20], mid: [32, 10, 45], horizon: [64, 15, 60], fog: 0x12061a },
-        { zenith: [28, 4, 16], mid: [85, 12, 35], horizon: [160, 20, 45], fog: 0x24050e },
-        { zenith: [20, 6, 42], mid: [60, 16, 95], horizon: [130, 30, 180], fog: 0x190829 },
-        { zenith: [45, 8, 12], mid: [140, 25, 20], horizon: [255, 60, 20], fog: 0x330806 }
-      ];
-    } else if (themeType === 'fairyland') {
+    if (themeType === 'fairyland') {
       zones = [
         { zenith: [60, 120, 180], mid: [140, 190, 230], horizon: [240, 200, 220], fog: 0x14283b },
         { zenith: [75, 40, 120], mid: [180, 80, 160], horizon: [255, 140, 180], fog: 0x2e1236 },
@@ -352,87 +363,173 @@ export class SceneryManager {
   }
 
   // ═════════════════════════════════════════════════════════════════
-  // LEVEL 1: GOTHIC CASTLE FORTRESS (Blood Moon, Spired Citadels, Gargoyles & Bats)
+  // 🏰 LEVEL 1: LIVING GOTHIC CASTLE ENVIRONMENT ENGINE
+  // Completely Scraps Neon: Authentic Dark Gothic Medieval Fortress
   // ═════════════════════════════════════════════════════════════════
+  renderGothicLivingSky(ctx, W, H, progressRatio, time, delta) {
+    const clamped = Math.max(0, Math.min(1.0, progressRatio));
+    const flash = (this.gothicLivingCastle && this.gothicLivingCastle.lightningFlash > 0) ? 
+                  this.gothicLivingCastle.lightningFlash : (this.flashIntensity || 0);
+
+    // Sky gradient according to the 5 acts
+    let zR, zG, zB, mR, mG, mB, hR, hG, hB;
+    if (clamped < 0.22) {
+      // Beginning: Quiet dark midnight
+      zR = 6; zG = 4; zB = 10;
+      mR = 14; mG = 8; mB = 20;
+      hR = 24; hG = 12; hB = 32;
+    } else if (clamped < 0.45) {
+      // Build-up: Storm clouds gathering
+      zR = 10; zG = 5; zB = 16;
+      mR = 26; mG = 10; mB = 34;
+      hR = 48; hG = 16; hB = 50;
+    } else if (clamped < 0.68) {
+      // First Drop: Eldritch purple aura
+      zR = 22; zG = 6; zB = 40;
+      mR = 52; mG = 14; mB = 78;
+      hR = 95; hG = 22; hB = 125;
+    } else if (clamped < 0.85) {
+      // Lightning Storm: Dark turbulent bruised tempest
+      zR = 16; zG = 6; zB = 26;
+      mR = 38; mG = 12; mB = 54;
+      hR = 72; hG = 20; hB = 88;
+    } else {
+      // Collapsing: Apocalyptic smoky crimson
+      zR = 30; zG = 5; zB = 14;
+      mR = 75; mG = 14; mB = 24;
+      hR = 140; hG = 24; hB = 32;
+    }
+
+    // Blinding lightning flash on stark strikes
+    if (flash > 0) {
+      const fi = Math.min(1.0, flash);
+      zR = Math.round(zR * (1 - fi) + 245 * fi);
+      zG = Math.round(zG * (1 - fi) + 240 * fi);
+      zB = Math.round(zB * (1 - fi) + 255 * fi);
+      mR = Math.round(mR * (1 - fi) + 220 * fi);
+      mG = Math.round(mG * (1 - fi) + 215 * fi);
+      mB = Math.round(mB * (1 - fi) + 250 * fi);
+      hR = Math.round(hR * (1 - fi) + 195 * fi);
+      hG = Math.round(hG * (1 - fi) + 190 * fi);
+      hB = Math.round(hB * (1 - fi) + 235 * fi);
+    }
+
+    // Fill Sky
+    const skyGrad = ctx.createLinearGradient(0, 0, 0, H);
+    skyGrad.addColorStop(0.0, `rgb(${zR},${zG},${zB})`);
+    skyGrad.addColorStop(0.55, `rgb(${mR},${mG},${mB})`);
+    skyGrad.addColorStop(1.0, `rgb(${hR},${hG},${hB})`);
+    ctx.fillStyle = skyGrad;
+    ctx.fillRect(0, 0, W, H);
+
+    // Giant Gothic Blood/Storm Moon
+    const moonX = W * 0.74, moonY = H * 0.36, moonR = 38;
+    const mGlow = ctx.createRadialGradient(moonX, moonY, moonR * 0.3, moonX, moonY, moonR * 2.4);
+    mGlow.addColorStop(0, 'rgba(230, 50, 80, 0.4)');
+    mGlow.addColorStop(0.55, 'rgba(140, 15, 45, 0.12)');
+    mGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
+    ctx.fillStyle = mGlow;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR * 2.4, 0, Math.PI * 2);
+    ctx.fill();
+
+    const mDisc = ctx.createRadialGradient(moonX - 8, moonY - 8, 6, moonX, moonY, moonR);
+    mDisc.addColorStop(0, '#fff2f4');
+    mDisc.addColorStop(0.4, '#e0586e');
+    mDisc.addColorStop(0.85, '#920516');
+    mDisc.addColorStop(1, '#34020a');
+    ctx.fillStyle = mDisc;
+    ctx.beginPath();
+    ctx.arc(moonX, moonY, moonR, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Dark lunar craters
+    ctx.fillStyle = 'rgba(25, 3, 8, 0.5)';
+    ctx.beginPath();
+    ctx.arc(moonX - 10, moonY - 6, 8, 0, Math.PI * 2);
+    ctx.arc(moonX + 12, moonY + 8, 6, 0, Math.PI * 2);
+    ctx.arc(moonX - 4, moonY + 12, 5, 0, Math.PI * 2);
+    ctx.fill();
+
+    // Drifting storm clouds across sky (Cloud speed accelerates with progression!)
+    const isFrozen = (this.gothicLivingCastle && this.gothicLivingCastle.isFrozen);
+    const cloudSpeed = isFrozen ? 0 : (clamped < 0.22 ? 3.5 : (clamped < 0.45 ? 11 : (clamped < 0.85 ? 20 : 26)));
+    ctx.fillStyle = 'rgba(14, 8, 20, 0.72)';
+    this.pixelClouds.forEach(c => {
+      const cx = (c.x + time * (cloudSpeed * (c.speed / 6))) % (W + c.w) - c.w;
+      ctx.fillRect(cx, c.y + 6, c.w * 1.25, c.h);
+      ctx.fillRect(cx + 10, c.y, c.w * 0.95, c.h * 1.35);
+      ctx.fillRect(cx + 20, c.y - 4, c.w * 0.7, c.h * 1.4);
+    });
+
+    // Update Three.js Fog color to match atmospheric sky horizon
+    if (this.scene && this.scene.fog) {
+      this.scene.fog.color.setRGB(hR / 255 * 0.2, hG / 255 * 0.2, hB / 255 * 0.2);
+    }
+    if (this.pixelSkyTexture) {
+      this.pixelSkyTexture.needsUpdate = true;
+    }
+  }
+
   buildGothicCastleScenery() {
     const W = 2048, H = 1024;
 
-    // ── LAYER 1: Distant Crags, Mountain Fortresses & Blood Moon (Z = -105, speed = 0.0006) ──
+    // Initialize the Living Castle state container
+    const castleGroup = new THREE.Group();
+    this.sceneryGroup.add(castleGroup);
+
+    this.gothicLivingCastle = {
+      active: true,
+      isFrozen: false,
+      castleGroup: castleGroup,
+      towers: [],
+      windows: [],
+      torches: [],
+      energyArcs: [],
+      fallingMasonry: [],
+      rainSystem: null,
+      rainMaterial: null,
+      fogPlanes: [],
+      lastLightningStrike: 0,
+      lightningFlash: 0
+    };
+
+    // ── LAYER 1: Distant Crags, Far Mountain Citadels (Z = -105, speed = 0.0006) ──
     const ctxFar = this.canvasFar;
     ctxFar.width = W; ctxFar.height = H;
     const gFar = ctxFar.getContext('2d');
     gFar.clearRect(0, 0, W, H);
 
-    // 1. Giant Blood Moon with glowing aura
-    const moonX = W * 0.72, moonY = H * 0.32, moonR = 125;
-    const mGlow = gFar.createRadialGradient(moonX, moonY, moonR * 0.4, moonX, moonY, moonR * 2.8);
-    mGlow.addColorStop(0, 'rgba(255, 30, 80, 0.55)');
-    mGlow.addColorStop(0.5, 'rgba(180, 10, 50, 0.22)');
-    mGlow.addColorStop(1, 'rgba(0, 0, 0, 0)');
-    gFar.fillStyle = mGlow;
-    gFar.beginPath();
-    gFar.arc(moonX, moonY, moonR * 2.8, 0, Math.PI * 2);
-    gFar.fill();
-
-    // Moon Disc
-    const mDisc = gFar.createRadialGradient(moonX - 25, moonY - 25, 20, moonX, moonY, moonR);
-    mDisc.addColorStop(0, '#ffebee');
-    mDisc.addColorStop(0.4, '#ff5252');
-    mDisc.addColorStop(0.85, '#b71c1c');
-    mDisc.addColorStop(1, '#4a0000');
-    gFar.fillStyle = mDisc;
-    gFar.beginPath();
-    gFar.arc(moonX, moonY, moonR, 0, Math.PI * 2);
-    gFar.fill();
-
-    // Dark lunar maria craters
-    gFar.fillStyle = 'rgba(35, 5, 15, 0.45)';
-    gFar.beginPath();
-    gFar.arc(moonX - 35, moonY - 20, 36, 0, Math.PI * 2);
-    gFar.arc(moonX + 45, moonY + 25, 28, 0, Math.PI * 2);
-    gFar.arc(moonX - 15, moonY + 45, 22, 0, Math.PI * 2);
-    gFar.arc(moonX + 20, moonY - 45, 18, 0, Math.PI * 2);
-    gFar.fill();
-
-    // Wispy storm clouds drifting across the moon
-    gFar.fillStyle = 'rgba(15, 5, 25, 0.65)';
-    for (let c = 0; c < 5; c++) {
-      const cy = moonY - 40 + c * 25;
-      gFar.beginPath();
-      gFar.ellipse(moonX + (c % 2 === 0 ? -40 : 40), cy, 180 + c * 30, 14 + c * 4, 0, 0, Math.PI * 2);
-      gFar.fill();
-    }
-
-    // 2. Distant Jagged Mountain Peaks & Far Citadel Silhouette
-    gFar.fillStyle = '#0a0312';
+    // Distant Jagged Mountain Peaks
+    gFar.fillStyle = '#08020d';
     gFar.beginPath();
     gFar.moveTo(0, H);
     for (let x = 0; x <= W; x += 30) {
-      const my = H * 0.46 + Math.sin(x * 0.005) * 110 + Math.sin(x * 0.015) * 55;
+      const my = H * 0.48 + Math.sin(x * 0.005) * 110 + Math.sin(x * 0.015) * 55;
       gFar.lineTo(x, my);
     }
     gFar.lineTo(W, H);
     gFar.closePath();
     gFar.fill();
 
-    // Distant mountain keep spires in silhouette
+    // Distant mountain keep spires in deep dark silhouette (Authentic dark iron, ZERO neon!)
     for (let sp = 0; sp < 8; sp++) {
       const sx = sp * 260 + 120;
-      const sy = H * 0.43 + Math.sin(sx * 0.005) * 80;
-      gFar.fillStyle = '#06010a';
+      const sy = H * 0.45 + Math.sin(sx * 0.005) * 80;
+      gFar.fillStyle = '#050109';
       gFar.beginPath();
       gFar.moveTo(sx - 20, sy);
-      gFar.lineTo(sx, sy - 85);
+      gFar.lineTo(sx, sy - 90);
       gFar.lineTo(sx + 20, sy);
       gFar.fill();
-      // Cross finial on top
-      gFar.strokeStyle = '#ff0055';
+      // Weathered wrought-iron finial cross
+      gFar.strokeStyle = '#220b2e';
       gFar.lineWidth = 2;
       gFar.beginPath();
-      gFar.moveTo(sx, sy - 95);
-      gFar.lineTo(sx, sy - 85);
-      gFar.moveTo(sx - 5, sy - 91);
-      gFar.lineTo(sx + 5, sy - 91);
+      gFar.moveTo(sx, sy - 100);
+      gFar.lineTo(sx, sy - 90);
+      gFar.moveTo(sx - 5, sy - 95);
+      gFar.lineTo(sx + 5, sy - 95);
       gFar.stroke();
     }
 
@@ -447,7 +544,7 @@ export class SceneryManager {
     this.sceneryGroup.add(meshFar);
     this.layers.push({ mesh: meshFar, texture: texFar, speed: 0.0006, baseOffset: 0 });
 
-    // ── LAYER 2: Grand Gothic Castle Fortress & Cathedrals (Z = -70, speed = 0.002) ──
+    // ── LAYER 2: Grand Ancient Gothic Castle Fortress (Z = -70, speed = 0.002) ──
     const ctxMid = this.canvasMid;
     ctxMid.width = W; ctxMid.height = H;
     const gMid = ctxMid.getContext('2d');
@@ -456,40 +553,49 @@ export class SceneryManager {
     let cx = 0;
     while (cx < W) {
       const castleW = Math.floor(Math.random() * 180 + 160);
-      const wallH = Math.floor(Math.random() * 200 + 260);
+      const wallH = Math.floor(Math.random() * 190 + 260);
       const wallY = H - wallH;
 
-      // Dark ancient stone wall gradient
+      // Dark ancient stone wall gradient (Weathered granite / basalt)
       const wallGrad = gMid.createLinearGradient(0, wallY, 0, H);
-      wallGrad.addColorStop(0, '#1c0c2a');
-      wallGrad.addColorStop(0.5, '#12071c');
-      wallGrad.addColorStop(1, '#08020d');
+      wallGrad.addColorStop(0, '#190e24');
+      wallGrad.addColorStop(0.5, '#100818');
+      wallGrad.addColorStop(1, '#08030d');
       gMid.fillStyle = wallGrad;
       gMid.fillRect(cx, wallY, castleW, wallH);
 
-      // Castellated battlements / crenellations along the wall top
-      const crenW = 18;
-      const crenH = 20;
-      gMid.fillStyle = '#220f33';
+      // Stone brick mortar seams
+      gMid.strokeStyle = 'rgba(38, 20, 55, 0.4)';
+      gMid.lineWidth = 1.5;
+      for (let by = wallY + 20; by < H; by += 28) {
+        gMid.beginPath();
+        gMid.moveTo(cx, by);
+        gMid.lineTo(cx + castleW, by);
+        gMid.stroke();
+      }
+
+      // Castellated battlements / stone crenellations along wall top
+      const crenW = 20, crenH = 22;
+      gMid.fillStyle = '#1e112a';
       for (let cr = cx; cr < cx + castleW - crenW; cr += crenW * 2) {
         gMid.fillRect(cr, wallY - crenH, crenW, crenH);
       }
 
-      // Tower (Left or Main Tower)
-      const towW = Math.floor(Math.random() * 60 + 50);
+      // Tower
+      const towW = Math.floor(Math.random() * 60 + 54);
       const towH = wallH + Math.floor(Math.random() * 180 + 140);
       const towY = H - towH;
       const towX = cx + Math.floor(Math.random() * 30);
 
       const towGrad = gMid.createLinearGradient(0, towY, 0, H);
-      towGrad.addColorStop(0, '#26103a');
-      towGrad.addColorStop(0.5, '#150821');
-      towGrad.addColorStop(1, '#09020e');
+      towGrad.addColorStop(0, '#221332');
+      towGrad.addColorStop(0.5, '#13091e');
+      towGrad.addColorStop(1, '#09030f');
       gMid.fillStyle = towGrad;
       gMid.fillRect(towX, towY, towW, towH);
 
       // Machicolations (stone brackets under battlements)
-      gMid.fillStyle = '#2d1445';
+      gMid.fillStyle = '#261538';
       gMid.fillRect(towX - 6, towY, towW + 12, 14);
 
       // Tower Crenellations
@@ -498,8 +604,8 @@ export class SceneryManager {
       }
 
       // Tall Pointed Gothic Conical Roof / Spire
-      const spireH = Math.floor(Math.random() * 90 + 70);
-      gMid.fillStyle = '#180726';
+      const spireH = Math.floor(Math.random() * 95 + 75);
+      gMid.fillStyle = '#14081e';
       gMid.beginPath();
       gMid.moveTo(towX - 8, towY - 14);
       gMid.lineTo(towX + towW / 2, towY - 14 - spireH);
@@ -507,15 +613,15 @@ export class SceneryManager {
       gMid.closePath();
       gMid.fill();
 
-      // Roof edge highlight
-      gMid.strokeStyle = 'rgba(255, 0, 85, 0.4)';
+      // Slate roof shading (NO neon!)
+      gMid.strokeStyle = 'rgba(40, 20, 60, 0.6)';
       gMid.lineWidth = 2;
       gMid.stroke();
 
-      // Spire Finial / Iron Cross
+      // Spire Finial Cross
       const finX = towX + towW / 2;
       const finY = towY - 14 - spireH;
-      gMid.strokeStyle = '#ff0055';
+      gMid.strokeStyle = '#2d143c';
       gMid.lineWidth = 2.5;
       gMid.beginPath();
       gMid.moveTo(finX, finY - 24);
@@ -524,82 +630,20 @@ export class SceneryManager {
       gMid.lineTo(finX + 7, finY - 16);
       gMid.stroke();
 
-      // Glowing Spire Tip Beacon
-      gMid.fillStyle = '#ff0055';
-      gMid.beginPath();
-      gMid.arc(finX, finY - 24, 3, 0, Math.PI * 2);
-      gMid.fill();
-
-      // Pointed Gothic Stained-Glass Arched Windows
-      const winCols = ['#ff0055', '#d500f9', '#ff5252', '#ffab00'];
-      for (let wy = towY + 35; wy < H - 80; wy += 55) {
-        const winW = 16, winH = 34;
-        const winX = towX + towW / 2 - winW / 2;
-        const winCol = winCols[Math.floor(Math.random() * winCols.length)];
-
-        // Window glow
-        gMid.shadowColor = winCol;
-        gMid.shadowBlur = 15;
-        gMid.fillStyle = winCol;
-
-        // Gothic pointed arch shape
-        gMid.beginPath();
-        gMid.moveTo(winX, wy + winH);
-        gMid.lineTo(winX, wy + winH * 0.45);
-        gMid.bezierCurveTo(winX, wy, winX + winW / 2, wy - 6, winX + winW / 2, wy - 6);
-        gMid.bezierCurveTo(winX + winW / 2, wy - 6, winX + winW, wy, winX + winW, wy + winH * 0.45);
-        gMid.lineTo(winX + winW, wy + winH);
-        gMid.closePath();
-        gMid.fill();
-        gMid.shadowBlur = 0;
-
-        // Dark iron window mullions & tracery cross
-        gMid.strokeStyle = '#0a0312';
-        gMid.lineWidth = 2;
-        gMid.beginPath();
-        gMid.moveTo(winX + winW / 2, wy - 4);
-        gMid.lineTo(winX + winW / 2, wy + winH);
-        gMid.moveTo(winX, wy + winH * 0.5);
-        gMid.lineTo(winX + winW, wy + winH * 0.5);
-        gMid.stroke();
-      }
-
-      // Flying Buttresses / Arched Bridge between towers
+      // Flying Buttresses / Stone Arched Bridge between towers
       if (Math.random() > 0.35 && cx + castleW < W) {
         const archStartX = cx + castleW - 10;
-        const archEndX = archStartX + 50;
+        const archEndX = archStartX + 55;
         const archY = wallY + 40;
-        gMid.strokeStyle = '#1d0c2c';
-        gMid.lineWidth = 12;
+        gMid.strokeStyle = '#180b26';
+        gMid.lineWidth = 14;
         gMid.beginPath();
         gMid.moveTo(archStartX, archY);
-        gMid.quadraticCurveTo(archStartX + 25, archY - 30, archEndX, archY);
+        gMid.quadraticCurveTo(archStartX + 25, archY - 28, archEndX, archY);
         gMid.stroke();
       }
 
-      // Torch Sconces on Wall with Amber Glow
-      if (Math.random() > 0.4) {
-        const tx = cx + Math.floor(castleW * 0.65);
-        const ty = wallY + 70;
-        gMid.fillStyle = 'rgba(255, 170, 0, 0.85)';
-        gMid.shadowColor = '#ff5500';
-        gMid.shadowBlur = 20;
-        gMid.beginPath();
-        gMid.arc(tx, ty, 8, 0, Math.PI * 2);
-        gMid.fill();
-        gMid.shadowBlur = 0;
-
-        // Iron bracket
-        gMid.strokeStyle = '#110518';
-        gMid.lineWidth = 3;
-        gMid.beginPath();
-        gMid.moveTo(tx, ty + 8);
-        gMid.lineTo(tx, ty + 20);
-        gMid.lineTo(tx - 8, ty + 26);
-        gMid.stroke();
-      }
-
-      cx += castleW + 12;
+      cx += castleW + 14;
     }
 
     const texMid = new THREE.CanvasTexture(ctxMid);
@@ -613,164 +657,274 @@ export class SceneryManager {
     this.sceneryGroup.add(meshMid);
     this.layers.push({ mesh: meshMid, texture: texMid, speed: 0.002, baseOffset: 0 });
 
-    // ── LAYER 3: Closer Parapets, Massive Gatehouse & Perched Gargoyles (Z = -45, speed = 0.004) ──
-    const ctxNear = this.canvasNear;
-    ctxNear.width = W; ctxNear.height = H;
-    const gNear = ctxNear.getContext('2d');
-    gNear.clearRect(0, 0, W, H);
+    // ── 3D MODULAR GOTHIC TOWERS & SPIRES (Tilt & Collapse in Act 5) ──
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x1a1324,
+      roughness: 0.88,
+      metalness: 0.18
+    });
+    const slateSpireMat = new THREE.MeshStandardMaterial({
+      color: 0x120a1a,
+      roughness: 0.82,
+      metalness: 0.25
+    });
 
-    let nx = 0;
-    while (nx < W) {
-      const secW = Math.floor(Math.random() * 220 + 200);
-      const secH = Math.floor(Math.random() * 220 + 160);
-      const secY = H - secH;
+    const towerCount = 10;
+    for (let t = 0; t < towerCount; t++) {
+      const towGroup = new THREE.Group();
+      const towX = t * 50 - 40;
+      const towZ = -55 - (t % 3) * 10;
+      const towH = 26 + (t % 4) * 6;
+      const towR = 4.5 + (t % 2) * 1.5;
 
-      // Heavy carved stone rampart
-      const rGrad = gNear.createLinearGradient(0, secY, 0, H);
-      rGrad.addColorStop(0, '#150921');
-      rGrad.addColorStop(0.4, '#0d0415');
-      rGrad.addColorStop(1, '#050109');
-      gNear.fillStyle = rGrad;
-      gNear.fillRect(nx, secY, secW, secH);
+      // Tower Cylinder
+      const tGeo = new THREE.CylinderGeometry(towR * 0.9, towR, towH, 8);
+      const tMesh = new THREE.Mesh(tGeo, stoneMat);
+      tMesh.position.y = towH / 2;
+      towGroup.add(tMesh);
 
-      // Stone brick lines
-      gNear.strokeStyle = 'rgba(45, 20, 65, 0.45)';
-      gNear.lineWidth = 2;
-      for (let by = secY + 16; by < H; by += 24) {
-        gNear.beginPath();
-        gNear.moveTo(nx, by);
-        gNear.lineTo(nx + secW, by);
-        gNear.stroke();
-        const rowOffset = (by % 48 === 0) ? 0 : 25;
-        for (let bx = nx + rowOffset; bx < nx + secW; bx += 50) {
-          gNear.beginPath();
-          gNear.moveTo(bx, by);
-          gNear.lineTo(bx, by + 24);
-          gNear.stroke();
-        }
+      // Machicolation Ring
+      const machGeo = new THREE.CylinderGeometry(towR * 1.15, towR * 0.95, 1.4, 8);
+      const machMesh = new THREE.Mesh(machGeo, stoneMat);
+      machMesh.position.y = towH;
+      towGroup.add(machMesh);
+
+      // Pointed Conical Spire
+      const spH = 14 + (t % 3) * 4;
+      const spGeo = new THREE.ConeGeometry(towR * 1.05, spH, 8);
+      const spMesh = new THREE.Mesh(spGeo, slateSpireMat);
+      spMesh.position.y = towH + spH / 2 + 0.7;
+      towGroup.add(spMesh);
+
+      // Iron Cross Finial on Top
+      const crossGroup = new THREE.Group();
+      const crossMat = new THREE.MeshStandardMaterial({ color: 0x0a060f, metalness: 0.85, roughness: 0.35 });
+      const cVert = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 2.2), crossMat);
+      const cHoriz = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.08, 1.2), crossMat);
+      cHoriz.rotation.z = Math.PI / 2;
+      cHoriz.position.y = 0.4;
+      crossGroup.add(cVert);
+      crossGroup.add(cHoriz);
+      crossGroup.position.y = towH + spH + 1.2;
+      towGroup.add(crossGroup);
+
+      // Add Pointed Arched Windows to Tower (with dynamic lighting!)
+      const winCount = 3;
+      for (let w = 0; w < winCount; w++) {
+        const winY = 8 + w * 6.5;
+        const winGeo = new THREE.PlaneGeometry(1.2, 2.6);
+        const dropColors = [0xc41230, 0x8822cc, 0xd48800];
+        const winMat = new THREE.MeshBasicMaterial({
+          color: 0xffaa33,
+          transparent: true,
+          opacity: 0.02,
+          depthWrite: false
+        });
+        const winMesh = new THREE.Mesh(winGeo, winMat);
+        winMesh.position.set(0, winY, towR * 0.92);
+        towGroup.add(winMesh);
+
+        this.gothicLivingCastle.windows.push({
+          mesh: winMesh,
+          threshold: (t * 3 + w) / (towerCount * winCount), // 0 to 1 progressive turn-on
+          dropColor: dropColors[w % dropColors.length]
+        });
       }
 
-      // Parapet top crenellations
-      const cW = 24, cH = 28;
-      gNear.fillStyle = '#1e0c2e';
-      for (let bx = nx; bx < nx + secW - cW; bx += cW * 2) {
-        gNear.fillRect(bx, secY - cH, cW, cH);
-        gNear.fillStyle = '#ff0055';
-        gNear.fillRect(bx, secY - cH, cW, 3);
-        gNear.fillStyle = '#1e0c2e';
-      }
+      // Add 3D Arcane Purple/Blue Energy Surge Beams & Ascending Plasma Rings
+      const isPurple = (t % 2 === 0);
+      const arcColor = isPurple ? 0xa855f7 : 0x00f0ff;
+      const ringColor = isPurple ? 0xd8b4fe : 0x7dd3fc;
 
-      // Perched Stone Gargoyle Silhouette on Watchtower Corner
-      if (Math.random() > 0.4) {
-        const gx = nx + Math.floor(Math.random() * (secW - 60)) + 30;
-        const gy = secY - cH - 24;
-        // Body
-        gNear.fillStyle = '#0b0211';
-        gNear.beginPath();
-        gNear.ellipse(gx, gy + 12, 16, 12, -Math.PI / 8, 0, Math.PI * 2);
-        gNear.fill();
-        // Head with horns
-        gNear.beginPath();
-        gNear.arc(gx + 12, gy + 4, 8, 0, Math.PI * 2);
-        gNear.fill();
-        gNear.beginPath();
-        gNear.moveTo(gx + 14, gy + 2);
-        gNear.lineTo(gx + 19, gy - 6);
-        gNear.lineTo(gx + 10, gy + 1);
-        gNear.fill();
-        // Wings spread
-        gNear.beginPath();
-        gNear.moveTo(gx - 4, gy + 8);
-        gNear.lineTo(gx - 26, gy - 16);
-        gNear.lineTo(gx - 14, gy + 4);
-        gNear.lineTo(gx - 20, gy + 14);
-        gNear.closePath();
-        gNear.fill();
-        // Glowing ruby eyes!
-        gNear.fillStyle = '#ff0055';
-        gNear.shadowColor = '#ff0055';
-        gNear.shadowBlur = 8;
-        gNear.beginPath();
-        gNear.arc(gx + 15, gy + 3, 2.5, 0, Math.PI * 2);
-        gNear.fill();
-        gNear.shadowBlur = 0;
-      }
+      // 1. Vertical plasma conduit along the full tower & spire height
+      const conduitGeo = new THREE.CylinderGeometry(0.16, 0.22, towH + spH, 8);
+      const conduitMat = new THREE.MeshBasicMaterial({
+        color: arcColor,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending
+      });
+      const conduitMesh = new THREE.Mesh(conduitGeo, conduitMat);
+      conduitMesh.position.set(0, (towH + spH) / 2, 0);
+      conduitMesh.visible = false;
+      towGroup.add(conduitMesh);
 
-      // Grand Arched Iron Portcullis Entrance Gate
-      if (Math.random() > 0.5 && secW > 240) {
-        const gw = 64, gh = 90;
-        const gx = nx + secW / 2 - gw / 2;
-        const gy = H - gh;
+      // 2. Ascending Glowing Plasma Ring traveling up the tower
+      const ringGeo = new THREE.TorusGeometry(towR * 1.06, 0.3, 8, 20);
+      const ringMat = new THREE.MeshBasicMaterial({
+        color: ringColor,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending
+      });
+      const ringMesh = new THREE.Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI / 2;
+      ringMesh.visible = false;
+      towGroup.add(ringMesh);
 
-        gNear.fillStyle = '#020005';
-        gNear.beginPath();
-        gNear.moveTo(gx, gy + gh);
-        gNear.lineTo(gx, gy + 30);
-        gNear.arc(gx + gw / 2, gy + 30, gw / 2, Math.PI, 0, false);
-        gNear.lineTo(gx + gw, gy + gh);
-        gNear.closePath();
-        gNear.fill();
+      // 3. Spire Tip Pulsing Energy Beacon
+      const tipGeo = new THREE.SphereGeometry(0.85, 8, 8);
+      const tipMat = new THREE.MeshBasicMaterial({
+        color: arcColor,
+        transparent: true,
+        opacity: 0.0,
+        blending: THREE.AdditiveBlending
+      });
+      const tipMesh = new THREE.Mesh(tipGeo, tipMat);
+      tipMesh.position.set(0, towH + spH + 1.2, 0);
+      tipMesh.visible = false;
+      towGroup.add(tipMesh);
 
-        gNear.strokeStyle = '#4a205a';
-        gNear.lineWidth = 3;
-        for (let px = gx + 10; px < gx + gw; px += 12) {
-          gNear.beginPath();
-          gNear.moveTo(px, gy + 20);
-          gNear.lineTo(px, gy + gh);
-          gNear.stroke();
-        }
-        for (let py = gy + 30; py < gy + gh; py += 16) {
-          gNear.beginPath();
-          gNear.moveTo(gx + 4, py);
-          gNear.lineTo(gx + gw - 4, py);
-          gNear.stroke();
-        }
-      }
+      this.gothicLivingCastle.energyArcs.push({
+        conduitMesh,
+        ringMesh,
+        tipMesh,
+        baseY: 0,
+        height: towH + spH,
+        speedMult: 2.2 + (t % 3) * 0.7
+      });
 
-      nx += secW + 15;
+      towGroup.position.set(towX, 0, towZ);
+      castleGroup.add(towGroup);
+
+      this.gothicLivingCastle.towers.push({
+        group: towGroup,
+        baseY: 0,
+        baseX: towX
+      });
     }
 
-    const texNear = new THREE.CanvasTexture(ctxNear);
-    texNear.wrapS = THREE.RepeatWrapping;
-    texNear.repeat.set(2, 1);
-    const meshNear = new THREE.Mesh(
-      new THREE.PlaneGeometry(260, 85),
-      new THREE.MeshBasicMaterial({ map: texNear, transparent: true, depthWrite: false })
-    );
-    meshNear.position.set(40, 22, -45);
-    this.sceneryGroup.add(meshNear);
-    this.layers.push({ mesh: meshNear, texture: texNear, speed: 0.004, baseOffset: 0 });
+    // ── 3D WALL SCONCE TORCHES WITH REAL FLICKERING FIRE ──
+    const torchCount = 12;
+    for (let br = 0; br < torchCount; br++) {
+      const bz = new THREE.Group();
+      // Wrought-iron wall bracket
+      const bracket = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.1, 0.1, 1.4, 6),
+        new THREE.MeshStandardMaterial({ color: 0x0a050f, metalness: 0.9, roughness: 0.3 })
+      );
+      bracket.rotation.z = Math.PI / 4;
+      bz.add(bracket);
+
+      // Iron bowl
+      const bowl = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.6, 0.25, 0.5, 8),
+        new THREE.MeshStandardMaterial({ color: 0x120a18, metalness: 0.85, roughness: 0.4 })
+      );
+      bowl.position.set(0.5, 0.6, 0);
+      bz.add(bowl);
+
+      // 3D Fire Flame Mesh
+      const flameGeo = new THREE.ConeGeometry(0.4, 1.1, 6);
+      const flameMat = new THREE.MeshBasicMaterial({
+        color: 0xff5500,
+        transparent: true,
+        opacity: 0.3
+      });
+      const flameMesh = new THREE.Mesh(flameGeo, flameMat);
+      flameMesh.position.set(0.5, 1.1, 0);
+      bz.add(flameMesh);
+
+      bz.position.set(br * 38 - 20, 6.5, -35);
+      castleGroup.add(bz);
+
+      this.gothicLivingCastle.torches.push({
+        group: bz,
+        flameMesh: flameMesh
+      });
+    }
+
+    // ── 3D WEATHER SYSTEM: 1,200 FALLING RAIN STREAKS ──
+    const rainCount = 1200;
+    const rainGeo = new THREE.BufferGeometry();
+    const rainPos = new Float32Array(rainCount * 6); // 2 vertices per streak
+    for (let i = 0; i < rainCount; i++) {
+      const idx = i * 6;
+      const rx = (Math.random() - 0.3) * 110;
+      const ry = Math.random() * 35;
+      const rz = (Math.random() - 0.5) * 32;
+      rainPos[idx] = rx;
+      rainPos[idx + 1] = ry;
+      rainPos[idx + 2] = rz;
+      rainPos[idx + 3] = rx + 0.35;
+      rainPos[idx + 4] = ry + 1.2;
+      rainPos[idx + 5] = rz;
+    }
+    rainGeo.setAttribute('position', new THREE.BufferAttribute(rainPos, 3));
+    const rainMat = new THREE.LineBasicMaterial({
+      color: 0x99bbee,
+      transparent: true,
+      opacity: 0.35,
+      depthWrite: false
+    });
+    const rainSystem = new THREE.LineSegments(rainGeo, rainMat);
+    this.sceneryGroup.add(rainSystem);
+    this.gothicLivingCastle.rainSystem = rainSystem;
+    this.gothicLivingCastle.rainMaterial = rainMat;
+
+    // ── 3D WEATHER: CREEPING LOW-LYING GROUND FOG MIST ──
+    const fogMat = new THREE.MeshBasicMaterial({
+      color: 0x181028,
+      transparent: true,
+      opacity: 0.28,
+      depthWrite: false
+    });
+    for (let f = 0; f < 3; f++) {
+      const fGeo = new THREE.PlaneGeometry(160, 10);
+      const fMesh = new THREE.Mesh(fGeo, fogMat);
+      fMesh.rotation.x = -Math.PI / 2;
+      fMesh.position.set(50, 0.4 + f * 0.6, -18 - f * 14);
+      this.sceneryGroup.add(fMesh);
+      this.gothicLivingCastle.fogPlanes.push({ mesh: fMesh, speed: 2.0 + f * 1.5 });
+    }
+
+    // ── 3D COLLAPSING MASONRY DEBRIS (Active in Act 5) ──
+    const stoneChunkGeo1 = new THREE.DodecahedronGeometry(0.65, 0);
+    const stoneChunkGeo2 = new THREE.BoxGeometry(0.8, 0.8, 0.8);
+    const rubbleMat = new THREE.MeshStandardMaterial({
+      color: 0x181220,
+      roughness: 0.9,
+      metalness: 0.15
+    });
+
+    for (let m = 0; m < 32; m++) {
+      const cMesh = new THREE.Mesh((m % 2 === 0 ? stoneChunkGeo1 : stoneChunkGeo2), rubbleMat);
+      cMesh.position.set((Math.random() - 0.2) * 80 + 350, 30 + Math.random() * 15, -15 - Math.random() * 30);
+      cMesh.visible = false;
+      castleGroup.add(cMesh);
+
+      this.gothicLivingCastle.fallingMasonry.push({
+        mesh: cMesh,
+        vx: (Math.random() - 0.5) * 4.0,
+        vy: -18.0 - Math.random() * 14.0,
+        rotX: Math.random() * 5.0,
+        rotY: Math.random() * 5.0,
+        rotZ: Math.random() * 5.0
+      });
+    }
 
     // ── 3D Dynamic Bats Swarm (Flapping Wings & Swooping) ──
     const batGroup = new THREE.Group();
-    batGroup.position.set(0, 28, -35);
+    batGroup.position.set(0, 26, -38);
     const bats = [];
     for (let b = 0; b < 14; b++) {
       const batObj = new THREE.Group();
       const bBody = new THREE.Mesh(
         new THREE.ConeGeometry(0.22, 0.7, 5),
-        new THREE.MeshBasicMaterial({ color: 0x14041a })
+        new THREE.MeshBasicMaterial({ color: 0x0c0312 })
       );
       bBody.rotation.x = Math.PI / 2;
       batObj.add(bBody);
 
       const lWingGeo = new THREE.BufferGeometry();
-      const lVerts = new Float32Array([
-        0, 0, 0,
-        -1.2, 0.2, -0.4,
-        -0.8, -0.3, 0.4
-      ]);
+      const lVerts = new Float32Array([0, 0, 0, -1.2, 0.2, -0.4, -0.8, -0.3, 0.4]);
       lWingGeo.setAttribute('position', new THREE.BufferAttribute(lVerts, 3));
-      const wingMat = new THREE.MeshBasicMaterial({ color: 0x1f0628, side: THREE.DoubleSide });
+      const wingMat = new THREE.MeshBasicMaterial({ color: 0x160520, side: THREE.DoubleSide });
       const lWing = new THREE.Mesh(lWingGeo, wingMat);
       batObj.add(lWing);
 
       const rWingGeo = new THREE.BufferGeometry();
-      const rVerts = new Float32Array([
-        0, 0, 0,
-        1.2, 0.2, -0.4,
-        0.8, -0.3, 0.4
-      ]);
+      const rVerts = new Float32Array([0, 0, 0, 1.2, 0.2, -0.4, 0.8, -0.3, 0.4]);
       rWingGeo.setAttribute('position', new THREE.BufferAttribute(rVerts, 3));
       const rWing = new THREE.Mesh(rWingGeo, wingMat);
       batObj.add(rWing);
@@ -782,6 +936,8 @@ export class SceneryManager {
     this.sceneryGroup.add(batGroup);
 
     this.animatedElements.push((time, delta) => {
+      const isFrozen = (this.gothicLivingCastle && this.gothicLivingCastle.isFrozen);
+      if (isFrozen) return;
       bats.forEach((bat) => {
         const flap = Math.sin(time * 18 + bat.phase) * 0.85;
         bat.lWing.rotation.z = flap;
@@ -793,61 +949,264 @@ export class SceneryManager {
         }
       });
     });
+  }
 
-    // ── 3D Flaming Castle Braziers with Floating Fire Particles ──
-    const brazierCount = 6;
-    for (let br = 0; br < brazierCount; br++) {
-      const bz = new THREE.Group();
-      const bowl = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.8, 0.4, 0.6, 8),
-        new THREE.MeshStandardMaterial({ color: 0x110816, metalness: 0.9 })
-      );
-      bz.add(bowl);
-      const fireCore = new THREE.Mesh(
-        new THREE.SphereGeometry(0.45, 8, 8),
-        new THREE.MeshBasicMaterial({ color: 0xff3300 })
-      );
-      fireCore.position.y = 0.35;
-      bz.add(fireCore);
+  // ── 🏰 GOTHIC CASTLE LIVING ENVIRONMENT TICK ENGINE ──
+  updateGothicCastle(playerX, progressRatio, time, delta) {
+    if (!this.gothicLivingCastle || !this.gothicLivingCastle.active) return;
+    const g = this.gothicLivingCastle;
+    const isFrozen = g.isFrozen;
+    const prog = progressRatio;
 
-      bz.position.set(br * 65 - 30, 8, -22);
-      this.sceneryGroup.add(bz);
+    // Follow player with gentle lag
+    if (g.castleGroup) {
+      g.castleGroup.position.x = playerX * 0.2;
+    }
 
-      this.animatedElements.push((time) => {
-        const fPulse = 0.9 + Math.sin(time * 12 + br) * 0.25;
-        fireCore.scale.set(fPulse, fPulse * 1.2, fPulse);
+    // 1. WEATHER: 3D RAIN SYSTEM
+    if (g.rainSystem && g.rainMaterial) {
+      const pos = g.rainSystem.geometry.attributes.position.array;
+      const count = pos.length / 6;
+
+      let rainVy = -26.0;
+      let rainVx = -4.0;
+      let rainAlpha = 0.35; // Beginning: Quiet castle, light gentle rain
+      if (prog >= 0.22 && prog < 0.45) {
+        rainAlpha = 0.55; // Build-up: Rain steadily picks up
+        rainVy = -38.0;
+        rainVx = -12.0;
+      } else if (prog >= 0.45 && prog < 0.68) {
+        rainAlpha = 0.82; // First Drop: Heavy rain
+        rainVy = -48.0;
+        rainVx = -20.0;
+      } else if (prog >= 0.68) {
+        rainAlpha = 1.0; // Lightning & Collapse: Torrential storm gale
+        rainVy = -58.0;
+        rainVx = -28.0;
+      }
+
+      g.rainMaterial.opacity = rainAlpha;
+
+      if (!isFrozen) {
+        for (let i = 0; i < count; i++) {
+          const idx = i * 6;
+          pos[idx] += rainVx * delta;
+          pos[idx + 1] += rainVy * delta;
+          pos[idx + 3] = pos[idx] - rainVx * 0.035;
+          pos[idx + 4] = pos[idx + 1] - rainVy * 0.035;
+
+          // Recycle drop when hitting floor
+          if (pos[idx + 1] < -2.0) {
+            pos[idx] = playerX + (Math.random() - 0.3) * 75;
+            pos[idx + 1] = 28 + Math.random() * 8;
+            pos[idx + 2] = (Math.random() - 0.5) * 30;
+            pos[idx + 3] = pos[idx] - rainVx * 0.035;
+            pos[idx + 4] = pos[idx + 1] - rainVy * 0.035;
+            pos[idx + 5] = pos[idx + 2];
+          }
+        }
+        g.rainSystem.geometry.attributes.position.needsUpdate = true;
+      }
+    }
+
+    // 2. WEATHER: CREEPING FOG
+    if (g.fogPlanes && !isFrozen) {
+      g.fogPlanes.forEach((fog, i) => {
+        fog.mesh.position.x = playerX + ((time * (3 + i * 2)) % 60) - 30;
+        fog.mesh.position.y = 1.0 + Math.sin(time * 0.8 + i) * 0.4;
       });
     }
 
-    // ── 3D Rising Fire Sparks & Embers ──
-    const sparkCount = 200;
-    const sparkGeo = new THREE.BufferGeometry();
-    const sparkPos = new Float32Array(sparkCount * 3);
-    for (let i = 0; i < sparkCount * 3; i += 3) {
-      sparkPos[i] = (Math.random() - 0.5) * 250;
-      sparkPos[i + 1] = Math.random() * 35;
-      sparkPos[i + 2] = (Math.random() - 0.5) * 30 - 20;
-    }
-    sparkGeo.setAttribute('position', new THREE.BufferAttribute(sparkPos, 3));
-    const sparkMat = new THREE.PointsMaterial({
-      color: 0xff2244,
-      size: 1.4,
-      transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending
-    });
-    const sparkPoints = new THREE.Points(sparkGeo, sparkMat);
-    this.sceneryGroup.add(sparkPoints);
-
-    this.animatedElements.push((time, delta) => {
-      const pos = sparkGeo.attributes.position.array;
-      for (let i = 1; i < sparkCount * 3; i += 3) {
-        pos[i] += delta * 9;
-        pos[i - 1] += Math.sin(time * 2 + i) * 0.12;
-        if (pos[i] > 38) pos[i] = 0;
+    // 3. DYNAMIC WINDOWS (Quiet -> Build-up -> Drop)
+    g.windows.forEach((win, i) => {
+      // Beginning (prog < 0.22): Only 2-3 windows flicker faintly
+      if (prog < 0.22) {
+        if (win.threshold < 0.1) {
+          const flk = 0.25 + Math.sin(time * 6 + i) * 0.08;
+          win.mesh.material.opacity = flk;
+          win.mesh.material.color.setHex(0xffaa33);
+        } else {
+          win.mesh.material.opacity = 0.02; // completely dark
+        }
+      } 
+      // Build-up (0.22 <= prog < 0.45): Windows turn on sequentially!
+      else if (prog < 0.45) {
+        const turnOnThreshold = 0.22 + (win.threshold * 0.22);
+        if (prog >= turnOnThreshold) {
+          const flk = 0.65 + Math.sin(time * 8 + i * 2) * 0.2;
+          win.mesh.material.opacity = flk;
+          win.mesh.material.color.setHex(0xffaa33);
+        } else {
+          win.mesh.material.opacity = 0.02;
+        }
       }
-      sparkGeo.attributes.position.needsUpdate = true;
+      // First Drop & Beyond (prog >= 0.45): Entire castle illuminates!
+      else {
+        const flk = 0.88 + Math.sin(time * 12 + i) * 0.12;
+        win.mesh.material.opacity = flk;
+        win.mesh.material.color.setHex(win.dropColor);
+      }
     });
+
+    // 4. TORCHES IGNITE (Build-up: prog >= 0.22)
+    g.torches.forEach((torch, i) => {
+      if (prog < 0.22) {
+        // Unlit / dim embers
+        torch.flameMesh.scale.set(0.2, 0.2, 0.2);
+        torch.flameMesh.material.color.setHex(0x441100);
+        torch.flameMesh.material.opacity = 0.35;
+      } else {
+        // Ignited! Roaring fire flames
+        const ignProgress = Math.min(1.0, (prog - 0.22) / 0.08);
+        const flk = 0.85 + Math.sin(time * 18 + i * 3) * 0.25;
+        const s = (0.3 + 0.7 * ignProgress) * flk;
+        torch.flameMesh.scale.set(s, s * 1.4, s);
+        torch.flameMesh.material.color.setHex(0xff5500);
+        torch.flameMesh.material.opacity = 0.95;
+      }
+    });
+
+    // 5. FIRST DROP: PURPLE/BLUE ARCANE ENERGY SURGES (prog >= 0.45)
+    if (g.energyArcs) {
+      const dropActive = (prog >= 0.45);
+      g.energyArcs.forEach((arc, i) => {
+        arc.conduitMesh.visible = dropActive;
+        arc.ringMesh.visible = dropActive;
+        arc.tipMesh.visible = dropActive;
+        if (dropActive && !isFrozen) {
+          const pulse = (time * arc.speedMult) % 1.0;
+          arc.ringMesh.position.y = arc.baseY + pulse * arc.height;
+          arc.ringMesh.material.opacity = Math.sin(pulse * Math.PI) * 0.88;
+          arc.conduitMesh.material.opacity = 0.45 + Math.sin(time * 16 + i * 2) * 0.35;
+          const isAtTop = pulse > 0.82;
+          arc.tipMesh.material.opacity = isAtTop ? 0.95 : 0.25;
+          const s = isAtTop ? (1.2 + Math.sin(time * 24) * 0.3) : 0.85;
+          arc.tipMesh.scale.set(s, s, s);
+        }
+      });
+    }
+
+    // 6. SECOND SECTION: LIGHTNING FLASHES (prog >= 0.68)
+    if (prog >= 0.68 && !isFrozen) {
+      if (time - g.lastLightningStrike > (Math.random() * 1.8 + 2.2)) {
+        g.lastLightningStrike = time;
+        this.triggerGothicLightningStrike(playerX);
+      }
+    }
+
+    // Decay lightning flash
+    if (g.lightningFlash > 0 && !isFrozen) {
+      g.lightningFlash = Math.max(0, g.lightningFlash - delta * 4.5);
+      if (this.scene && this.scene.background) {
+        if (g.lightningFlash > 0.05) {
+          this.scene.background.setRGB(
+            0.15 + g.lightningFlash * 0.75,
+            0.15 + g.lightningFlash * 0.75,
+            0.25 + g.lightningFlash * 0.85
+          );
+        } else {
+          this.scene.background.setHex(0x040308);
+        }
+      }
+    }
+
+    // 7. FINAL SECTION: CASTLE COLLAPSING (prog >= 0.85)
+    if (prog >= 0.85) {
+      const collapseProgress = (prog - 0.85) / 0.15;
+      
+      if (!isFrozen) {
+        // Towers tilt and sway dangerously
+        g.towers.forEach((towerObj, i) => {
+          const tiltDir = (i % 2 === 0 ? 1 : -1);
+          const tiltAmp = (0.12 + (i % 3) * 0.08) * collapseProgress;
+          towerObj.group.rotation.z = Math.sin(time * 4.0 + i) * tiltAmp * 0.4 + tiltDir * tiltAmp * 0.8;
+          towerObj.group.position.y = towerObj.baseY - Math.abs(Math.sin(time * 3.0 + i)) * (collapseProgress * 3.5) - (i >= 6 ? collapseProgress * 6.0 : 0);
+        });
+
+        // Falling masonry debris raining down!
+        g.fallingMasonry.forEach(chunk => {
+          chunk.mesh.visible = true;
+          chunk.mesh.position.x += chunk.vx * delta;
+          chunk.mesh.position.y += chunk.vy * delta;
+          chunk.mesh.rotation.x += chunk.rotX * delta;
+          chunk.mesh.rotation.y += chunk.rotY * delta;
+          chunk.mesh.rotation.z += chunk.rotZ * delta;
+
+          if (chunk.mesh.position.y < -15.0) {
+            chunk.mesh.position.x = playerX + (Math.random() - 0.2) * 70;
+            chunk.mesh.position.y = 28 + Math.random() * 12;
+            chunk.mesh.position.z = -15 - Math.random() * 35;
+          }
+        });
+      }
+    } else {
+      // Clean reset when rewinding or restarting before collapse section
+      if (g.towers) {
+        g.towers.forEach(t => {
+          t.group.rotation.z = 0;
+          t.group.position.y = t.baseY;
+        });
+      }
+      if (g.fallingMasonry) {
+        g.fallingMasonry.forEach(m => {
+          m.mesh.visible = false;
+        });
+      }
+    }
+  }
+
+  // ⚡ Trigger Procedural 3D Lightning Bolt & Flash
+  triggerGothicLightningStrike(playerX) {
+    if (!this.gothicLivingCastle) return;
+    const g = this.gothicLivingCastle;
+    g.lightningFlash = 1.0;
+
+    // Trigger visual screen flash
+    this.triggerObstacleFlash(0xffffff, 1.0);
+
+    // Audio thunderclap
+    if (typeof window !== 'undefined' && window.dashAudio) {
+      window.dashAudio.playThunderClap();
+    }
+
+    // Screen shake via renderer
+    if (this.renderer && typeof this.renderer.triggerScreenShake === 'function') {
+      this.renderer.triggerScreenShake(0.85, 0.28);
+    }
+
+    // 3D lightning bolt geometry
+    const boltGeo = this.createLightningBoltGeometry(playerX + (Math.random() - 0.5) * 40);
+    if (boltGeo) {
+      const boltMat = new THREE.LineBasicMaterial({
+        color: 0xffffff,
+        linewidth: 3,
+        transparent: true,
+        opacity: 1.0
+      });
+      const boltMesh = new THREE.Line(boltGeo, boltMat);
+      this.sceneryGroup.add(boltMesh);
+      setTimeout(() => {
+        this.sceneryGroup.remove(boltMesh);
+        boltGeo.dispose();
+        boltMat.dispose();
+      }, 140);
+    }
+  }
+
+  createLightningBoltGeometry(targetX) {
+    const points = [];
+    let curX = targetX + (Math.random() - 0.5) * 20;
+    let curY = 55;
+    let curZ = -70;
+    points.push(new THREE.Vector3(curX, curY, curZ));
+
+    while (curY > 5) {
+      curY -= (Math.random() * 6 + 4);
+      curX += (Math.random() - 0.5) * 8;
+      curZ += (Math.random() - 0.5) * 4;
+      points.push(new THREE.Vector3(curX, curY, curZ));
+    }
+    return new THREE.BufferGeometry().setFromPoints(points);
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -1211,6 +1570,7 @@ export class SceneryManager {
     this.layers = [];
     this.animatedElements = [];
     this.particleSystems = [];
+    this.gothicLivingCastle = null;
   }
 
   // ═════════════════════════════════════════════════════════════════
@@ -1768,6 +2128,11 @@ export class SceneryManager {
     this.renderPixelSky(playerX, progressRatio, time, delta);
     if (this.pixelSkyMesh) {
       this.pixelSkyMesh.position.x = playerX + 60;
+    }
+
+    // 1b. Update Gothic Living Castle Environment
+    if (this.gothicLivingCastle && this.gothicLivingCastle.active) {
+      this.updateGothicCastle(playerX, progressRatio, time, delta);
     }
 
     // 2. Parallax scroll on canvas textures

@@ -220,6 +220,9 @@ class GameManager {
       victoryNextBtn: document.getElementById('victory-next-btn'),
       victoryReplayBtn: document.getElementById('victory-replay-btn'),
       victoryAttempts: document.getElementById('victory-attempts'),
+      gothicClimaxOverlay: document.getElementById('gothic-climax-overlay'),
+      gothicNextBtn: document.getElementById('gothic-next-btn'),
+      gothicReplayBtn: document.getElementById('gothic-replay-btn'),
 
       // Brainrot Pop-Up
       brainrotPopup: document.getElementById('brainrot-popup'),
@@ -317,10 +320,29 @@ class GameManager {
     this.level = this.levels[index];
     this.level.baseSpeed = this.level.baseSpeed || this.level.speed;
     this.currentSpeedMult = 1.0;
+    this.attempts = 1;
+    if (this.deathSpotCounts) this.deathSpotCounts.clear();
+    this.isTimeFrozen = false;
     this.checkpoints = [];
     this.totalLevelGems = this.level.obstacles.filter(o => o.type === 'gem').length;
     this.gemsCollected.clear();
     this.brainrotMilestones.clear();
+
+    // Dismiss Gothic Climax Overlay if open
+    const gothicOverlay = document.getElementById('gothic-climax-overlay');
+    if (gothicOverlay) {
+      gothicOverlay.style.display = 'none';
+      document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
+      document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
+      document.getElementById('gothic-card-container')?.classList.remove('slam-active');
+    }
+
+    if (this.renderer && this.renderer.sceneryManager) {
+      this.renderer.sceneryManager.setFrozen(false);
+    }
+    if (this.renderer && this.renderer.resetUnstableBlocks) {
+      this.renderer.resetUnstableBlocks();
+    }
 
     // Reset Player
     this.resetPlayer(true);
@@ -411,6 +433,22 @@ class GameManager {
           if (o.type === 'shield') {
             o.collected = (o.x < cp.x && cp.hasShield);
           }
+          if (o.unstable && o.x >= cp.x - 2) {
+            o._shaking = false;
+            o._fallen = false;
+            o._shakeTimer = 0;
+            if (this.renderer && this.renderer.unstableBlocks && this.renderer.unstableBlocks.has(o)) {
+              const entry = this.renderer.unstableBlocks.get(o);
+              entry.fallen = false;
+              entry.shaking = false;
+              entry.shakeTimer = 0;
+              entry.vy = 0;
+              entry.mesh.position.y = entry.initialY;
+              entry.mesh.position.x = entry.initialX;
+              entry.mesh.position.z = entry.initialZ;
+              entry.mesh.visible = true;
+            }
+          }
         });
         if (this.renderer && this.renderer.shieldPickupMeshes) {
           this.renderer.shieldPickupMeshes.forEach(sp => {
@@ -421,6 +459,9 @@ class GameManager {
           });
         }
       }
+
+      // Restore orbTriggered from checkpoint snapshot
+      this.player.orbTriggered = new Set(cp.orbTriggered || []);
 
       this.updateGemHUD();
       if (this.renderer && this.renderer.resetGems) {
@@ -452,6 +493,22 @@ class GameManager {
       this.player.orbTriggered.clear();
       audio.updateShipThrust(0);
 
+      // Reset Gothic Living Environment Freeze & Overlay
+      this.isTimeFrozen = false;
+      const gothicOverlay = document.getElementById('gothic-climax-overlay');
+      if (gothicOverlay) {
+        gothicOverlay.style.display = 'none';
+        document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
+        document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
+        document.getElementById('gothic-card-container')?.classList.remove('slam-active');
+      }
+      if (this.renderer && this.renderer.sceneryManager) {
+        this.renderer.sceneryManager.setFrozen(false);
+      }
+      if (this.renderer && this.renderer.resetUnstableBlocks) {
+        this.renderer.resetUnstableBlocks();
+      }
+
       // Reset Style Meter
       if (this.styleSystem) {
         this.styleSystem.score = 0;
@@ -466,10 +523,15 @@ class GameManager {
         this.bossManager.reset();
       }
 
-      // Reset shield pickups
+      // Reset shield pickups & unstable blocks
       if (this.level && this.level.obstacles) {
         this.level.obstacles.forEach(o => {
           if (o.type === 'shield') o.collected = false;
+          if (o.unstable) {
+            o._shaking = false;
+            o._fallen = false;
+            o._shakeTimer = 0;
+          }
         });
       }
       if (this.renderer && this.renderer.shieldPickupMeshes) {
@@ -481,6 +543,11 @@ class GameManager {
 
       const shieldInd = document.getElementById('player-shield-indicator');
       if (shieldInd) shieldInd.style.display = 'none';
+
+      // Ensure rhythm beat alignment on full track restart
+      if (isFullReset && this.level && this.level.bpm) {
+        audio.startMusic(this.level.bpm, this.level.theme);
+      }
     }
     this.jumpBufferTimer = 0;
     this.coyoteTimer = 0;
@@ -500,6 +567,12 @@ class GameManager {
     if (warpOverlay) {
       warpOverlay.classList.remove('warp-active');
       warpOverlay.style.display = 'none';
+    }
+    if (typeof this.closeGothicEndingOverlay === 'function') {
+      this.closeGothicEndingOverlay();
+    }
+    if (this.gameState === 'GOTHIC_CLIMAX' && this.level && this.level.bpm) {
+      audio.startMusic(this.level.bpm, this.level.theme);
     }
     this.gameState = 'PLAYING';
   }
@@ -745,6 +818,96 @@ class GameManager {
       this.dom.memeChaosModal.style.display = 'none';
     }
   }
+  // -------------------------------------------------------------
+  // 🏰 EPIC GOTHIC CASTLE CLIMAX: MUSIC CUT, TIME FREEZE & TITLE SLAM
+  // -------------------------------------------------------------
+  startGothicEndingSequence() {
+    if (this.gameState === 'GOTHIC_CLIMAX' || this.gameState === 'VICTORY') return;
+    this.gameState = 'GOTHIC_CLIMAX';
+    this.isTimeFrozen = true;
+
+    // 1. MUSIC CUTS INSTANTLY (Dead-Stop Silence)
+    audio.cutMusicInstant();
+    audio.stopShipHum();
+    audio.updateShipThrust(0);
+
+    // 2. EVERYTHING FREEZES (Time stopped in space - freeze frame)
+    this.player.vy = 0;
+    this.player.isHolding = false;
+    if (this.renderer && typeof this.renderer.setCinematicFreeze === 'function') {
+      this.renderer.setCinematicFreeze(true);
+    }
+
+    // 3. TENSION PAUSE... (1000ms dead silence)
+    setTimeout(() => {
+      if (this.gameState !== 'GOTHIC_CLIMAX') return;
+
+      // 4. THEN: BOOM! (Sub-bass 808 explosion + cathedral gong + stone shatter)
+      audio.playGothicEndingBoom();
+
+      // Screen trauma & shrapnel debris explosion
+      if (this.renderer && typeof this.renderer.triggerGothicEndingBoom === 'function') {
+        this.renderer.triggerGothicEndingBoom(this.player.x, this.player.y + 0.5);
+      }
+
+      // 5. SLAM TITLE CARD (Full-Screen Visual Climax)
+      const overlay = document.getElementById('gothic-climax-overlay');
+      const flash = document.getElementById('gothic-flash-blast');
+      const ring = document.getElementById('gothic-shockwave-ring');
+      const card = document.getElementById('gothic-card-container');
+
+      if (overlay) {
+        overlay.style.display = 'flex';
+        overlay.classList.add('active');
+        if (flash) {
+          flash.classList.remove('flash-active');
+          void flash.offsetWidth;
+          flash.classList.add('flash-active');
+        }
+        if (ring) {
+          ring.classList.remove('wave-active');
+          void ring.offsetWidth;
+          ring.classList.add('wave-active');
+        }
+        if (card) {
+          card.classList.remove('slam-active');
+          void card.offsetWidth;
+          card.classList.add('slam-active');
+        }
+      }
+
+      // Populate gothic score & stats
+      const statAttempts = document.getElementById('gothic-stat-attempts');
+      const statGems = document.getElementById('gothic-stat-gems');
+      const statAura = document.getElementById('gothic-stat-aura');
+      if (statAttempts) statAttempts.textContent = `${this.attempts}`;
+      if (statGems) statGems.textContent = `${this.gemsCollected.size} / ${this.totalLevelGems || 3}`;
+      if (statAura) statAura.textContent = `+50,000 🔥`;
+
+      // Record 100% completion in local storage
+      this.bestScores[this.currentLevelIndex] = 100;
+      this.saveBestScores();
+    }, 1000);
+  }
+
+  closeGothicEndingOverlay() {
+    const overlay = document.getElementById('gothic-climax-overlay');
+    if (overlay) {
+      overlay.classList.remove('active');
+      overlay.style.display = 'none';
+      document.getElementById('gothic-flash-blast')?.classList.remove('flash-active');
+      document.getElementById('gothic-shockwave-ring')?.classList.remove('wave-active');
+      document.getElementById('gothic-card-container')?.classList.remove('slam-active');
+    }
+    this.isTimeFrozen = false;
+    if (this.renderer && this.renderer.sceneryManager) {
+      this.renderer.sceneryManager.setFrozen(false);
+    }
+    if (this.renderer && typeof this.renderer.setCinematicFreeze === 'function') {
+      this.renderer.setCinematicFreeze(false);
+    }
+  }
+
   // -------------------------------------------------------------
   // ⚡ HIGH-POWER INDUCTOR COIL LEVEL FINISH TRANSITION
   // -------------------------------------------------------------
@@ -1100,6 +1263,26 @@ class GameManager {
       this.loadLevel(this.currentLevelIndex);
     });
 
+    // 🏰 Gothic Castle Climax Ending Modal Buttons
+    const gothicNextBtn = document.getElementById('gothic-next-btn');
+    if (gothicNextBtn) {
+      gothicNextBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeGothicEndingOverlay();
+        const nextIdx = (this.currentLevelIndex + 1) % this.levels.length;
+        this.loadLevel(nextIdx);
+      });
+    }
+
+    const gothicReplayBtn = document.getElementById('gothic-replay-btn');
+    if (gothicReplayBtn) {
+      gothicReplayBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        this.closeGothicEndingOverlay();
+        this.loadLevel(this.currentLevelIndex);
+      });
+    }
+
     // 🍄 Smurf Cat Modal Resume
     if (this.dom.smurfResumeBtn) {
       this.dom.smurfResumeBtn.addEventListener('click', (e) => {
@@ -1430,6 +1613,10 @@ class GameManager {
       return;
     }
 
+    if (this.gameState === 'GOTHIC_CLIMAX') {
+      return;
+    }
+
     if (this.gameState !== 'PLAYING' || !this.player.isAlive) {
       if (this.gameState === 'CRASHED') {
         this.respawnTimer -= dt;
@@ -1442,6 +1629,23 @@ class GameManager {
 
     if (this.player.invulnerableTimer && this.player.invulnerableTimer > 0) {
       this.player.invulnerableTimer -= dt;
+    }
+
+    // ── Update Unstable Blocks Shaking Timers ──
+    if (this.level && this.level.obstacles) {
+      for (let i = 0; i < this.level.obstacles.length; i++) {
+        const obs = this.level.obstacles[i];
+        if (obs.unstable && obs._shaking && !obs._fallen) {
+          obs._shakeTimer -= dt;
+          if (obs._shakeTimer <= 0) {
+            obs._fallen = true;
+            obs._shaking = false;
+            if (this.renderer) {
+              this.renderer.dropUnstableBlock(obs);
+            }
+          }
+        }
+      }
     }
 
     // Substep integration for high-speed accuracy
@@ -1470,9 +1674,13 @@ class GameManager {
       }
     }
 
-    // ⚡ Check Inductor Coil Warp Transition Reached
+    // ⚡ Check Level Finish: Gothic Sanctuary Climax vs Sci-Fi Inductor Coil Transition
     if (this.player.x >= this.level.endX && this.gameState === 'PLAYING') {
-      this.startInductorCoilTransition();
+      if (this.level && this.level.themeType === 'gothic') {
+        this.startGothicEndingSequence();
+      } else {
+        this.startInductorCoilTransition();
+      }
     }
   }
 
@@ -1700,6 +1908,7 @@ class GameManager {
         }
       }
       else if (obs.type === 'block') {
+        if (obs._fallen) continue;
         const bx = obs.x;
         const by = obs.y;
         const bw = obs.w || 2;
@@ -1727,6 +1936,13 @@ class GameManager {
                   p.y = top;
                   p.vy = 0;
                   p.isGrounded = true;
+                  if (obs.unstable && !obs._shaking && !obs._fallen) {
+                    obs._shaking = true;
+                    obs._shakeTimer = 0.38;
+                    if (this.renderer) {
+                      this.renderer.shakeUnstableBlock(obs, 0.38);
+                    }
+                  }
                 }
               } else {
                 const isInternalSeam = this.level.obstacles.some(o => 
@@ -1789,6 +2005,13 @@ class GameManager {
               p.y = top;
               p.vy = Math.max(0, p.vy);
               p.isGrounded = true;
+              if (obs.unstable && !obs._shaking && !obs._fallen) {
+                obs._shaking = true;
+                obs._shakeTimer = 0.38;
+                if (this.renderer) {
+                  this.renderer.shakeUnstableBlock(obs, 0.38);
+                }
+              }
             } else if (p.gravityDir === -1 && playerTop <= bottom + 0.45) {
               p.y = bottom - 1.0;
               p.vy = Math.min(0, p.vy);
@@ -2292,6 +2515,9 @@ class GameManager {
     this.dom.progressPercent.textContent = `${progress.toFixed(1)}%`;
     this.dom.playerMarker.style.left = `${progress}%`;
 
+    // Update procedural music progression across the 5 acts
+    audio.setTrackProgression(progress / 100);
+
     // Real-Time Speedometer Refresh
     const speedEl = document.getElementById('speedometer-val');
     if (speedEl) {
@@ -2561,6 +2787,7 @@ class GameManager {
     if (this.dom.memeChaosModal) this.dom.memeChaosModal.style.display = 'none';
     if (this.dom.victoryModal) this.dom.victoryModal.style.display = 'none';
     if (this.dom.smurfModal) this.dom.smurfModal.style.display = 'none';
+    if (this.dom.gothicClimaxOverlay) this.dom.gothicClimaxOverlay.style.display = 'none';
 
     audio.stopMusic();
     this.resetPlayer(true);
@@ -2930,9 +3157,38 @@ class GameManager {
       return;
     }
 
+    // C. Gothic Climax Ending State: Everything frozen in space, camera shake & shockwave
+    if (this.gameState === 'GOTHIC_CLIMAX') {
+      this.renderer.update({
+        x: this.player.x,
+        y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
+        z: this.player.z || 0,
+        vy: 0,
+        rotationZ: this.player.rotationZ,
+        vehicleMode: this.player.vehicleMode,
+        gravityDir: this.player.gravityDir,
+        hasShield: false,
+        invulnerableTimer: 0,
+        speedMult: 0,
+        isGrounded: true,
+        isAlive: true,
+        isThrusting: false,
+        isCoilTransition: false,
+        coilProgress: 0
+      }, dt);
+      requestAnimationFrame(t => this.gameLoop(t));
+      return;
+    }
+
     // 1. Update Player Physics & Collisions
     this.updatePhysics(dt);
     this.updateStyleDecay(dt);
+
+    // Living environment audio progression (Castle 5-act evolution)
+    if (this.gameState === 'PLAYING' && this.level && this.level.endX) {
+      const progRatio = Math.max(0, Math.min(1.0, this.player.x / this.level.endX));
+      audio.setTrackProgression(progRatio);
+    }
 
     // 1b. Update Meme Chaos Timers (Tung Tung Sahur Random Event)
     if (this.gameState === 'PLAYING' && this.chaosMode !== 'off') {

@@ -2367,3 +2367,274 @@ body, html {
   }
 }
 
+/* ═════════════════════════════════════════════════════════════════
+   🏰 GOTHIC CASTLE CLIMAX & TITLE CARD SLAM STYLES
+   ═════════════════════════════════════════════════════════════════ */
+.gothic-climax-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 99999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(ellipse at center, rgba(28, 8, 20, 0.94) 0%, rgba(10, 3, 10, 0.98) 70%, #030105 100%);
+  overflow: hidden;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  pointer-events: auto;
+}
+
+.gothic-flash-blast {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at center, rgba(255, 255, 255, 1) 0%, rgba(255, 40, 80, 0.9) 35%, rgba(120, 10, 30, 0) 75%);
+  pointer-events: none;
+  opacity: 0;
+  z-index: 10;
+}
+
+.gothic-flash-blast.flash-active {
+  animation: gothicFlashBlastAnim 0.85s cubic-bezier(0.1, 0.9, 0.2, 1) forwards;
+}
+
+@keyframes gothicFlashBlastAnim {
+  0% { opacity: 1; transform: scale(1); }
+  25% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1.4); }
+}
+
+.gothic-shockwave-ring {
+  position: absolute;
+  width: 100px;
+  height: 100px;
+  border-radius: 50%;
+  border: 4px solid #ff2255;
+  box-shadow: 0 0 50px #ff0044, inset 0 0 40px #ff0033;
+  pointer-events: none;
+  opacity: 0;
+  z-index: 9;
+}
+
+.gothic-shockwave-ring.wave-active {
+  animation: gothicShockwaveExpand 1.1s cubic-bezier(0.05, 0.85, 0.2, 1) forwards;
+}
+
+@keyframes gothicShockwaveExpand {
+  0% { opacity: 1; transform: scale(0.2); border-width: 8px; }
+  70% { opacity: 0.7; }
+  100% { opacity: 0; transform: scale(18); border-width: 1px; }
+}
+
+.gothic-card-container {
+  position: relative;
+  z-index: 15;
+  width: 90%;
+  max-width: 660px;
+  background: linear-gradient(180deg, rgba(30, 12, 28, 0.98) 0%, rgba(14, 5, 16, 0.99) 100%);
+  border: 2px solid rgba(160, 30, 50, 0.75);
+  box-shadow:
+    0 0 70px rgba(0, 0, 0, 0.95),
+    0 0 40px rgba(220, 20, 60, 0.4),
+    inset 0 0 40px rgba(100, 10, 25, 0.5);
+  border-radius: 20px;
+  padding: 38px 44px;
+  text-align: center;
+  color: #fff;
+  opacity: 0;
+  transform: scale(2.6) translateY(-50px);
+  filter: blur(14px);
+  transition: none;
+}
+
+.gothic-card-container.slam-active {
+  animation: gothicCardSlamAnim 0.75s cubic-bezier(0.12, 1.15, 0.28, 1) forwards;
+}
+
+@keyframes gothicCardSlamAnim {
+  0% {
+    opacity: 0;
+    transform: scale(2.6) translateY(-50px);
+    filter: blur(14px);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(0.96) translateY(4px);
+    filter: blur(0px);
+  }
+  80% {
+    transform: scale(1.02) translateY(-2px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+    filter: blur(0px);
+  }
+}
+
+.gothic-crest-top {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  font-size: 28px;
+  margin-bottom: 6px;
+  filter: drop-shadow(0 0 12px rgba(255, 30, 70, 0.7));
+}
+
+.gothic-survived-banner {
+  display: inline-block;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 3px;
+  text-transform: uppercase;
+  color: #ff8899;
+  background: rgba(220, 20, 60, 0.18);
+  border: 1px solid rgba(220, 20, 60, 0.45);
+  padding: 4px 18px;
+  border-radius: 20px;
+  box-shadow: 0 0 18px rgba(220, 20, 60, 0.25);
+  margin-bottom: 10px;
+}
+
+.gothic-main-title {
+  font-family: 'Cinzel', 'Georgia', serif;
+  font-size: 54px;
+  font-weight: 900;
+  letter-spacing: 5px;
+  text-transform: uppercase;
+  margin: 4px 0 2px 0;
+  background: linear-gradient(180deg, #ffffff 0%, #ffcbd3 30%, #e02844 70%, #750d1e 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  filter: drop-shadow(0 0 25px rgba(255, 20, 60, 0.8));
+  line-height: 1.1;
+}
+
+.gothic-subtitle {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 4px;
+  text-transform: uppercase;
+  color: #c49ba5;
+  margin-bottom: 18px;
+  opacity: 0.85;
+}
+
+.gothic-card-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin: 14px 0 24px 0;
+}
+
+.gothic-card-divider .divider-line {
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(220, 20, 60, 0.5), transparent);
+}
+
+.gothic-card-divider .divider-skull {
+  font-size: 18px;
+  opacity: 0.85;
+}
+
+.gothic-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin-bottom: 28px;
+}
+
+.gothic-stat-box {
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(220, 20, 60, 0.25);
+  border-radius: 12px;
+  padding: 12px 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: transform 0.2s ease, border-color 0.2s ease;
+}
+
+.gothic-stat-box:hover {
+  transform: translateY(-2px);
+  border-color: rgba(220, 20, 60, 0.6);
+  background: rgba(220, 20, 60, 0.08);
+}
+
+.gothic-stat-num {
+  font-size: 20px;
+  font-weight: 900;
+  color: #fff;
+  letter-spacing: 1px;
+}
+
+.gothic-stat-lbl {
+  font-size: 9px;
+  font-weight: 800;
+  color: #9c8a92;
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+}
+
+.gothic-actions-row {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.gothic-action-btn {
+  padding: 14px 28px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.22s ease;
+  outline: none;
+  position: relative;
+  overflow: hidden;
+}
+
+.gothic-btn-next {
+  background: linear-gradient(135deg, #e02844 0%, #8b1025 100%);
+  color: #fff;
+  border: 1px solid #ff4466;
+  box-shadow: 0 0 25px rgba(224, 40, 68, 0.55), inset 0 0 15px rgba(255, 255, 255, 0.25);
+}
+
+.gothic-btn-next:hover {
+  transform: translateY(-2px) scale(1.03);
+  box-shadow: 0 0 35px rgba(224, 40, 68, 0.85), inset 0 0 20px rgba(255, 255, 255, 0.4);
+}
+
+.gothic-btn-replay {
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffb5c2;
+  border: 1px solid rgba(220, 20, 60, 0.35);
+}
+
+.gothic-btn-replay:hover {
+  background: rgba(220, 20, 60, 0.15);
+  color: #fff;
+  border-color: rgba(220, 20, 60, 0.7);
+  transform: translateY(-2px);
+}
+
+@media (max-width: 600px) {
+  .gothic-card-container {
+    padding: 24px 18px;
+  }
+  .gothic-main-title {
+    font-size: 36px;
+  }
+  .gothic-stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .gothic-actions-row {
+    flex-direction: column;
+  }
+}
+

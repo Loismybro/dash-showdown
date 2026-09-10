@@ -86,6 +86,18 @@ export class GameRenderer {
 
     // Procedural Scenery Manager (Parallax Metropolis, Alien Ruins, Inferno, Quantum Nebula)
     this.sceneryManager = null;
+    this.unstableBlocks = new Map();
+    this.cameraShakeIntensity = 0;
+    this.cameraShakeTimer = 0;
+
+    // 🏰 Gothic Living Castle Systems & Ending Climax
+    this.gothicSanctuaryGate = null;
+    this.gothicFloorMeshes = [];
+    this.unstableBlockMeshes = [];
+    this.isCinematicFrozen = false;
+    this.gothicBoomParticles = [];
+    this.groundEdge = null;
+    this.gridMesh = null;
 
     // Player Vehicles & High-End Animation Systems
     this.playerGroup = new THREE.Group();
@@ -185,7 +197,7 @@ export class GameRenderer {
     this.setupLighting();
 
     // 5. Initialize Procedural Scenery Manager
-    this.sceneryManager = new SceneryManager(this.scene);
+    this.sceneryManager = new SceneryManager(this.scene, this);
 
     // 6. Track & Obstacles Groups
     this.scene.add(this.trackGroup);
@@ -309,6 +321,7 @@ export class GameRenderer {
     this.shieldPickupMeshes = [];
     this.counterOrbMeshes = [];
     this.speedGateMeshes = [];
+    if (this.unstableBlocks) this.unstableBlocks.clear();
     if (this.shieldShatterPool) {
       this.shieldShatterPool.forEach(s => { s.active = false; s.mesh.visible = false; });
     }
@@ -330,53 +343,109 @@ export class GameRenderer {
       this.camera.updateProjectionMatrix();
     }
 
+    // Clean up Gothic Castle specific elements
+    if (this.gothicSanctuaryGate) {
+      this.trackGroup.remove(this.gothicSanctuaryGate);
+      this.gothicSanctuaryGate.traverse(obj => {
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      });
+      this.gothicSanctuaryGate = null;
+    }
+    if (this.gothicFloorMeshes && this.gothicFloorMeshes.length > 0) {
+      this.gothicFloorMeshes.forEach(obj => {
+        this.trackGroup.remove(obj);
+        if (obj.geometry) obj.geometry.dispose();
+        if (obj.material) {
+          if (Array.isArray(obj.material)) obj.material.forEach(m => m.dispose());
+          else obj.material.dispose();
+        }
+      });
+    }
+    this.gothicFloorMeshes = [];
+    this.unstableBlockMeshes = [];
+    this.isCinematicFrozen = false;
+
     // Set Level Theme Color
     this.themeColor.set(level.diffColor || "#00FF88");
     if (this.underglow) this.underglow.color.copy(this.themeColor);
 
-    // Setup Multi-Layered Procedural Scenery (Metropolis / Alien Ruins / Inferno / Quantum Nebula)
+    // Setup Multi-Layered Procedural Scenery (Metropolis / Alien Ruins / Inferno / Quantum Nebula / Gothic Castle)
     this.sceneryManager.setupLevelScenery(level);
 
-    // 1. Neon Track Floor
+    const isGothic = (level.themeType === 'gothic');
+    const groundLength = level.endX + 120;
+    const groundGeo = new THREE.BoxGeometry(groundLength, 4, 14);
+
+    // 1. Track Floor - Gothic Dark Stone vs Cyber Neon
     if (this.groundMesh) {
       this.trackGroup.remove(this.groundMesh);
       this.groundMesh.geometry.dispose();
+      this.groundMesh = null;
     }
-    const groundLength = level.endX + 120;
-    const groundGeo = new THREE.BoxGeometry(groundLength, 4, 14);
-    const groundMat = new THREE.MeshStandardMaterial({
-      color: 0x060810,
-      roughness: 0.3,
-      metalness: 0.85
-    });
-    this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
-    this.groundMesh.position.set(groundLength / 2 - 20, -2, 0);
-    this.trackGroup.add(this.groundMesh);
+    if (this.groundEdge) {
+      this.trackGroup.remove(this.groundEdge);
+      this.groundEdge.geometry.dispose();
+      this.groundEdge = null;
+    }
+    if (this.gridMesh) {
+      this.trackGroup.remove(this.gridMesh);
+      this.gridMesh.geometry.dispose();
+      this.gridMesh = null;
+    }
 
-    // Glowing Neon Top Edge Strip
-    const edgeGeo = new THREE.BoxGeometry(groundLength, 0.16, 0.5);
-    const edgeMat = new THREE.MeshBasicMaterial({ color: this.themeColor });
-    const groundEdge = new THREE.Mesh(edgeGeo, edgeMat);
-    groundEdge.position.set(groundLength / 2 - 20, 0.08, 2.5);
-    this.trackGroup.add(groundEdge);
+    if (isGothic) {
+      // Authentic Dark Medieval Slate Stone Masonry Floor (NO glowing neon strip, NO cyber grid!)
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x14161d,
+        roughness: 0.94,
+        metalness: 0.12
+      });
+      this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
+      this.groundMesh.position.set(groundLength / 2 - 20, -2, 0);
+      this.trackGroup.add(this.groundMesh);
 
-    // Track Grid Lines on Floor
-    const gridGeo = new THREE.PlaneGeometry(groundLength, 8, Math.floor(groundLength / 2), 4);
-    const gridMat = new THREE.MeshBasicMaterial({
-      color: this.themeColor,
-      wireframe: true,
-      transparent: true,
-      opacity: 0.12
-    });
-    const gridMesh = new THREE.Mesh(gridGeo, gridMat);
-    gridMesh.rotation.x = -Math.PI / 2;
-    gridMesh.position.set(groundLength / 2 - 20, 0.02, 0);
-    this.trackGroup.add(gridMesh);
+      // Build Stone Parapets, Corbel Arches & Wall Torch Sconces
+      this.buildGothicFloorDetails(groundLength);
+    } else {
+      const groundMat = new THREE.MeshStandardMaterial({
+        color: 0x060810,
+        roughness: 0.3,
+        metalness: 0.85
+      });
+      this.groundMesh = new THREE.Mesh(groundGeo, groundMat);
+      this.groundMesh.position.set(groundLength / 2 - 20, -2, 0);
+      this.trackGroup.add(this.groundMesh);
+
+      // Glowing Neon Top Edge Strip
+      const edgeGeo = new THREE.BoxGeometry(groundLength, 0.16, 0.5);
+      const edgeMat = new THREE.MeshBasicMaterial({ color: this.themeColor });
+      this.groundEdge = new THREE.Mesh(edgeGeo, edgeMat);
+      this.groundEdge.position.set(groundLength / 2 - 20, 0.08, 2.5);
+      this.trackGroup.add(this.groundEdge);
+
+      // Track Grid Lines on Floor
+      const gridGeo = new THREE.PlaneGeometry(groundLength, 8, Math.floor(groundLength / 2), 4);
+      const gridMat = new THREE.MeshBasicMaterial({
+        color: this.themeColor,
+        wireframe: true,
+        transparent: true,
+        opacity: 0.12
+      });
+      this.gridMesh = new THREE.Mesh(gridGeo, gridMat);
+      this.gridMesh.rotation.x = -Math.PI / 2;
+      this.gridMesh.position.set(groundLength / 2 - 20, 0.02, 0);
+      this.trackGroup.add(this.gridMesh);
+    }
 
     // Neon Ceiling Platform (for Ship / Gravity Inversion levels)
     if (this.ceilingMesh) {
       this.trackGroup.remove(this.ceilingMesh);
       this.ceilingMesh.geometry.dispose();
+      this.ceilingMesh = null;
     }
     if (level.id >= 2) {
       const ceilGeo = new THREE.BoxGeometry(groundLength, 4, 14);
@@ -403,132 +472,277 @@ export class GameRenderer {
       this.createObstacleMesh(obs, index);
     });
 
-    // 3. ⚡ High-Power 3D Inductor Coil Transition Gate at Level Finish
-    this.createInductorCoil(level.endX);
+    // 3. Level Finish: Gothic Sanctuary Gate vs Sci-Fi Inductor Coil
+    if (isGothic) {
+      this.createGothicSanctuaryGate(level.endX);
+    } else {
+      this.createInductorCoil(level.endX);
+    }
   }
 
   createObstacleMesh(obs, index) {
     const { type, x, y } = obs;
 
     if (type === "spike") {
-      // Realistic 3D Obsidian Crystal Spike with Hex Steel Base & Glowing Energy Core
-      const spikeGroup = new THREE.Group();
-      const height = 1.08;
-      const radius = 0.52;
+      const isGothic = (this.currentLevel && this.currentLevel.themeType === 'gothic');
+      if (isGothic) {
+        // 🏰 Authentic Dark Medieval Forged Iron Pike on Weathered Stone Pedestal (Zero Neon!)
+        const spikeGroup = new THREE.Group();
+        const height = 1.1;
+        const radius = 0.48;
 
-      // 1. Heavy Gunmetal Hexagonal Base Plate with Neon Hazard Trim
-      const baseGeo = new THREE.CylinderGeometry(radius * 1.15, radius * 1.25, 0.12, 6);
-      const baseMat = new THREE.MeshStandardMaterial({
-        color: 0x0e1320,
-        roughness: 0.28,
-        metalness: 0.94
-      });
-      const basePlate = new THREE.Mesh(baseGeo, baseMat);
-      basePlate.position.y = 0.06;
-      spikeGroup.add(basePlate);
+        // 1. Heavy Weathered Stone Octagonal Pedestal Base
+        const baseGeo = new THREE.CylinderGeometry(radius * 1.2, radius * 1.35, 0.16, 8);
+        const baseMat = new THREE.MeshStandardMaterial({
+          color: 0x1c1e24,
+          roughness: 0.92,
+          metalness: 0.12
+        });
+        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+        baseMesh.position.y = 0.08;
+        spikeGroup.add(baseMesh);
 
-      // Warning hazard wireframe around hexagonal base
-      const baseWireGeo = new THREE.EdgesGeometry(baseGeo);
-      const hazardColor = obs.dir === "down" ? 0xff0055 : 0xffaa00;
-      const baseWireMat = new THREE.LineBasicMaterial({ color: hazardColor, linewidth: 1.5 });
-      basePlate.add(new THREE.LineSegments(baseWireGeo, baseWireMat));
+        // 2. Forged Black Iron Spire Pike with 4 Chiseled Blade Facets
+        const pikeGeo = new THREE.ConeGeometry(radius, height, 4);
+        const pikeMat = new THREE.MeshStandardMaterial({
+          color: 0x121316,
+          roughness: 0.42,
+          metalness: 0.85,
+          flatShading: true
+        });
+        const pikeMesh = new THREE.Mesh(pikeGeo, pikeMat);
+        pikeMesh.position.y = 0.16 + height / 2;
+        pikeMesh.rotation.y = Math.PI / 4;
+        spikeGroup.add(pikeMesh);
 
-      // 2. Multi-faceted 8-Facet Obsidian Crystal Cone with Metallic Specular Sheen
-      const coneGeo = new THREE.ConeGeometry(radius, height, 8);
-      const coneMat = new THREE.MeshStandardMaterial({
-        color: 0x080c18,
-        roughness: 0.06,
-        metalness: 0.98,
-        flatShading: true
-      });
-      const cone = new THREE.Mesh(coneGeo, coneMat);
-      cone.position.y = 0.12 + height / 2;
-      spikeGroup.add(cone);
+        // 3. Forged Iron Collar Ring
+        const collarGeo = new THREE.CylinderGeometry(radius * 0.75, radius * 0.85, 0.08, 8);
+        const collarMat = new THREE.MeshStandardMaterial({
+          color: 0x22242a,
+          roughness: 0.5,
+          metalness: 0.85
+        });
+        const collar = new THREE.Mesh(collarGeo, collarMat);
+        collar.position.y = 0.18;
+        spikeGroup.add(collar);
 
-      // 3. Razor-Sharp Saturated Glowing Neon Bevel Wireframe
-      const wireGeo = new THREE.EdgesGeometry(coneGeo);
-      const isGothicSpike = (this.currentLevel && this.currentLevel.themeType === 'gothic');
-      const wireColor = obs.dir === "down" ? 0xff0055 : (isGothicSpike ? 0xff0055 : 0x00f0ff);
-      const wireMat = new THREE.LineBasicMaterial({ color: wireColor, linewidth: 2.5 });
-      const wire = new THREE.LineSegments(wireGeo, wireMat);
-      cone.add(wire);
+        if (obs.dir === "down") {
+          spikeGroup.rotation.z = Math.PI;
+          spikeGroup.position.set(x, y, 0);
+        } else {
+          spikeGroup.position.set(x, y, 0);
+        }
 
-      // 4. Floating Pulsing Internal Energy Core (Octahedron)
-      const coreGeo = new THREE.OctahedronGeometry(0.18, 0);
-      const coreMat = new THREE.MeshBasicMaterial({
-        color: wireColor,
-        transparent: true,
-        opacity: 0.95
-      });
-      const core = new THREE.Mesh(coreGeo, coreMat);
-      core.position.y = 0.42;
-      spikeGroup.add(core);
-
-      if (obs.dir === "down") {
-        spikeGroup.rotation.z = Math.PI;
-        spikeGroup.position.set(x, y, 0);
+        spikeGroup.userData = { obstacle: obs, isGothic: true };
+        this.spikeMeshes.push(spikeGroup);
+        this.obstaclesGroup.add(spikeGroup);
       } else {
-        spikeGroup.position.set(x, y, 0);
-      }
+        // Realistic 3D Obsidian Crystal Spike with Hex Steel Base & Glowing Energy Core
+        const spikeGroup = new THREE.Group();
+        const height = 1.08;
+        const radius = 0.52;
 
-      spikeGroup.userData = {
-        core: core,
-        wireColor: wireColor,
-        pulseOffset: Math.random() * Math.PI * 2
-      };
-      this.spikeMeshes.push(spikeGroup);
-      this.obstaclesGroup.add(spikeGroup);
+        // 1. Heavy Gunmetal Hexagonal Base Plate with Neon Hazard Trim
+        const baseGeo = new THREE.CylinderGeometry(radius * 1.15, radius * 1.25, 0.12, 6);
+        const baseMat = new THREE.MeshStandardMaterial({
+          color: 0x0e1320,
+          roughness: 0.28,
+          metalness: 0.94
+        });
+        const basePlate = new THREE.Mesh(baseGeo, baseMat);
+        basePlate.position.y = 0.06;
+        spikeGroup.add(basePlate);
+
+        // Warning hazard wireframe around hexagonal base
+        const baseWireGeo = new THREE.EdgesGeometry(baseGeo);
+        const hazardColor = obs.dir === "down" ? 0xff0055 : 0xffaa00;
+        const baseWireMat = new THREE.LineBasicMaterial({ color: hazardColor, linewidth: 1.5 });
+        basePlate.add(new THREE.LineSegments(baseWireGeo, baseWireMat));
+
+        // 2. Multi-faceted 8-Facet Obsidian Crystal Cone with Metallic Specular Sheen
+        const coneGeo = new THREE.ConeGeometry(radius, height, 8);
+        const coneMat = new THREE.MeshStandardMaterial({
+          color: 0x080c18,
+          roughness: 0.06,
+          metalness: 0.98,
+          flatShading: true
+        });
+        const cone = new THREE.Mesh(coneGeo, coneMat);
+        cone.position.y = 0.12 + height / 2;
+        spikeGroup.add(cone);
+
+        // 3. Razor-Sharp Saturated Glowing Neon Bevel Wireframe
+        const wireGeo = new THREE.EdgesGeometry(coneGeo);
+        const wireColor = obs.dir === "down" ? 0xff0055 : 0x00f0ff;
+        const wireMat = new THREE.LineBasicMaterial({ color: wireColor, linewidth: 2.5 });
+        const wire = new THREE.LineSegments(wireGeo, wireMat);
+        cone.add(wire);
+
+        // 4. Floating Pulsing Internal Energy Core (Octahedron)
+        const coreGeo = new THREE.OctahedronGeometry(0.18, 0);
+        const coreMat = new THREE.MeshBasicMaterial({
+          color: wireColor,
+          transparent: true,
+          opacity: 0.95
+        });
+        const core = new THREE.Mesh(coreGeo, coreMat);
+        core.position.y = 0.42;
+        spikeGroup.add(core);
+
+        if (obs.dir === "down") {
+          spikeGroup.rotation.z = Math.PI;
+          spikeGroup.position.set(x, y, 0);
+        } else {
+          spikeGroup.position.set(x, y, 0);
+        }
+
+        spikeGroup.userData = {
+          core: core,
+          wireColor: wireColor,
+          pulseOffset: Math.random() * Math.PI * 2
+        };
+        this.spikeMeshes.push(spikeGroup);
+        this.obstaclesGroup.add(spikeGroup);
+      }
     }
     else if (type === "block") {
-      // Themed Track Block with Gothic Ramparts or Neon Edges
       const w = obs.w || 2;
       const h = obs.h || 2;
+      const isUnstable = !!obs.unstable;
       const isGothic = (this.currentLevel && this.currentLevel.themeType === 'gothic');
       const isFairyland = (this.currentLevel && this.currentLevel.themeType === 'fairyland');
       const isShark = (this.currentLevel && this.currentLevel.themeType === 'shark');
-      
-      const themeBlockColor = isGothic ? 0x14081c : 0x090d18;
-      const themeWireColor = isGothic ? 0xff0055 : (isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9));
 
-      const geo = new THREE.BoxGeometry(w, h, 2.2);
-      const mat = new THREE.MeshStandardMaterial({
-        color: themeBlockColor,
-        roughness: isGothic ? 0.45 : 0.25,
-        metalness: isGothic ? 0.75 : 0.85
-      });
-      const block = new THREE.Mesh(geo, mat);
+      if (isGothic) {
+        // 🏰 Medieval Fortress Masonry Block with Forged Iron Straps & Stone Battlement Details (Zero Neon!)
+        const blockGeo = new THREE.BoxGeometry(w, h, 2.2);
+        const blockMat = new THREE.MeshStandardMaterial({
+          color: isUnstable ? 0x22171c : 0x161820,
+          roughness: 0.9,
+          metalness: 0.18
+        });
+        const block = new THREE.Mesh(blockGeo, blockMat);
 
-      const wireGeo = new THREE.EdgesGeometry(geo);
-      const wireMat = new THREE.LineBasicMaterial({ color: themeWireColor, linewidth: 2 });
-      block.add(new THREE.LineSegments(wireGeo, wireMat));
+        // Carved Dark Stone Coping Bevel (Top)
+        const stoneCopingGeo = new THREE.BoxGeometry(w + 0.04, 0.12, 2.24);
+        const stoneCopingMat = new THREE.MeshStandardMaterial({
+          color: isUnstable ? 0x341a22 : 0x242730,
+          roughness: 0.85,
+          metalness: 0.15
+        });
+        const stoneCopingTop = new THREE.Mesh(stoneCopingGeo, stoneCopingMat);
+        stoneCopingTop.position.y = h / 2 - 0.06;
+        block.add(stoneCopingTop);
 
-      // Inner glowing pattern / gothic masonry rune
-      const innerGeo = new THREE.PlaneGeometry(w * 0.75, h * 0.75);
-      const innerMat = new THREE.MeshBasicMaterial({ color: themeWireColor, transparent: true, opacity: 0.15 });
-      const inner = new THREE.Mesh(innerGeo, innerMat);
-      inner.position.z = 1.11;
-      block.add(inner);
+        // Forged Black Iron Straps / Corner Brackets
+        const strapGeo = new THREE.BoxGeometry(0.18, h * 0.9, 2.22);
+        const strapMat = new THREE.MeshStandardMaterial({
+          color: 0x0f1013,
+          roughness: 0.4,
+          metalness: 0.85
+        });
+        const strapL = new THREE.Mesh(strapGeo, strapMat);
+        strapL.position.x = -w / 2 + 0.25;
+        block.add(strapL);
+        const strapR = new THREE.Mesh(strapGeo, strapMat);
+        strapR.position.x = w / 2 - 0.25;
+        block.add(strapR);
 
-      // Gothic Castle Battlement Crenellations on top of rampart blocks
-      if (isGothic && h >= 1.5 && w >= 3) {
-        const crenCount = Math.floor(w / 1.5);
-        for (let cr = 0; cr < crenCount; cr += 2) {
-          const cren = new THREE.Mesh(
-            new THREE.BoxGeometry(0.7, 0.45, 2.22),
-            new THREE.MeshStandardMaterial({ color: 0x220c30, roughness: 0.5 })
-          );
-          cren.position.set(-w / 2 + 0.5 + cr * 1.5, h / 2 + 0.22, 0);
-          const crenWire = new THREE.LineSegments(
-            new THREE.EdgesGeometry(cren.geometry),
-            new THREE.LineBasicMaterial({ color: 0xff0055, linewidth: 1.5 })
-          );
-          cren.add(crenWire);
-          block.add(cren);
+        // Battlement Crenellations for ramparts (NO glowing wire!)
+        if (!isUnstable && h >= 1.5 && w >= 3) {
+          const crenCount = Math.floor(w / 1.5);
+          for (let cr = 0; cr < crenCount; cr += 2) {
+            const cren = new THREE.Mesh(
+              new THREE.BoxGeometry(0.7, 0.45, 2.22),
+              new THREE.MeshStandardMaterial({ color: 0x1e2028, roughness: 0.85, metalness: 0.15 })
+            );
+            cren.position.set(-w / 2 + 0.5 + cr * 1.5, h / 2 + 0.22, 0);
+            block.add(cren);
+          }
         }
-      }
 
-      block.position.set(x + w / 2, y + h / 2, 0);
-      this.obstaclesGroup.add(block);
+        block.position.set(x + w / 2, y + h / 2, 0);
+        block.userData = {
+          obstacle: obs,
+          isGothic: true,
+          isUnstable: isUnstable,
+          baseX: x + w / 2,
+          baseY: y + h / 2,
+          baseZ: 0,
+          jitterPhase: Math.random() * Math.PI * 2
+        };
+
+        if (isUnstable) {
+          this.unstableBlockMeshes.push(block);
+          if (!this.unstableBlocks) this.unstableBlocks = new Map();
+          this.unstableBlocks.set(obs, {
+            mesh: block,
+            initialX: x + w / 2,
+            initialY: y + h / 2,
+            initialZ: 0,
+            shake: 0,
+            shakeTimer: 0,
+            falling: false,
+            vy: 0,
+            rotVel: 0
+          });
+        }
+        this.obstaclesGroup.add(block);
+      } else {
+        // Themed Track Block with Neon Edges
+        const themeBlockColor = isUnstable ? 0x240610 : 0x090d18;
+        const themeWireColor = isUnstable ? 0xff1744 : (isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9));
+
+        const geo = new THREE.BoxGeometry(w, h, 2.2);
+        const mat = new THREE.MeshStandardMaterial({
+          color: themeBlockColor,
+          roughness: isUnstable ? 0.65 : 0.25,
+          metalness: 0.85
+        });
+        const block = new THREE.Mesh(geo, mat);
+
+        const wireGeo = new THREE.EdgesGeometry(geo);
+        const wireMat = new THREE.LineBasicMaterial({ color: themeWireColor, linewidth: isUnstable ? 2.5 : 2 });
+        block.add(new THREE.LineSegments(wireGeo, wireMat));
+
+        // Inner glowing pattern
+        const innerGeo = new THREE.PlaneGeometry(w * 0.78, h * 0.78);
+        const innerMat = new THREE.MeshBasicMaterial({
+          color: themeWireColor,
+          transparent: true,
+          opacity: isUnstable ? 0.35 : 0.15
+        });
+        const inner = new THREE.Mesh(innerGeo, innerMat);
+        inner.position.z = 1.11;
+        block.add(inner);
+
+        block.position.set(x + w / 2, y + h / 2, 0);
+        block.userData = {
+          obstacle: obs,
+          isUnstable: isUnstable,
+          baseX: x + w / 2,
+          baseY: y + h / 2,
+          baseZ: 0,
+          jitterPhase: Math.random() * Math.PI * 2
+        };
+
+        if (isUnstable) {
+          this.unstableBlockMeshes.push(block);
+          if (!this.unstableBlocks) this.unstableBlocks = new Map();
+          this.unstableBlocks.set(obs, {
+            mesh: block,
+            initialX: x + w / 2,
+            initialY: y + h / 2,
+            initialZ: 0,
+            shake: 0,
+            shakeTimer: 0,
+            falling: false,
+            vy: 0,
+            rotVel: 0
+          });
+        }
+        this.obstaclesGroup.add(block);
+      }
     }
     else if (type === "pad") {
       // High-Impact Jump Pad (Yellow / Pink / Red)
@@ -874,7 +1088,6 @@ export class GameRenderer {
       this.counterOrbMeshes.push(turretGroup);
     }
     else if (type === "stairs") {
-      // 🪜 Premium 3D Multi-Tier Architectural Staircase with LED Light Runners
       const stairGroup = new THREE.Group();
       const numSteps = obs.steps || 4;
       const stepW = obs.stepW || 1.2;
@@ -884,72 +1097,128 @@ export class GameRenderer {
       const isFairyland = (this.currentLevel && this.currentLevel.themeType === 'fairyland');
       const isShark = (this.currentLevel && this.currentLevel.themeType === 'shark');
 
-      const stairBaseColor = isGothic ? 0x14081c : (isFairyland ? 0x1a0d28 : (isShark ? 0x071b2c : 0x090f1d));
-      const stairNeonColor = isGothic ? 0xff0055 : (isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9));
+      if (isGothic) {
+        // 🏰 Medieval Chiseled Dark Stone Steps with Forged Iron Rivet Detailing (Zero Neon!)
+        for (let i = 0; i < numSteps; i++) {
+          const stepIdx = (dir === "down") ? (numSteps - 1 - i) : i;
+          const currentH = (stepIdx + 1) * stepH;
+          const stepX = x + i * stepW + stepW / 2;
+          const stepY = y + currentH / 2;
 
-      const stepRunners = [];
-      const riserPanels = [];
+          const stepGeo = new THREE.BoxGeometry(stepW, currentH, 2.4);
+          const stepMat = new THREE.MeshStandardMaterial({
+            color: 0x1c1e26,
+            roughness: 0.88,
+            metalness: 0.15
+          });
+          const stepMesh = new THREE.Mesh(stepGeo, stepMat);
+          stepMesh.position.set(stepX, stepY, 0);
 
-      for (let i = 0; i < numSteps; i++) {
-        const stepIdx = (dir === "down") ? (numSteps - 1 - i) : i;
-        const currentH = (stepIdx + 1) * stepH;
-        const stepX = x + i * stepW + stepW / 2;
-        const stepY = y + currentH / 2;
+          // Chiseled Stone Nosing along tread edge
+          const nosingGeo = new THREE.BoxGeometry(stepW * 1.02, 0.08, 0.15);
+          const nosingMat = new THREE.MeshStandardMaterial({
+            color: 0x2c2f3a,
+            roughness: 0.8,
+            metalness: 0.2
+          });
+          const nosing = new THREE.Mesh(nosingGeo, nosingMat);
+          nosing.position.set(0, currentH / 2 - 0.04, 1.22);
+          stepMesh.add(nosing);
 
-        // 1. Step Base Body
-        const stepGeo = new THREE.BoxGeometry(stepW, currentH, 2.4);
-        const stepMat = new THREE.MeshStandardMaterial({
-          color: stairBaseColor,
-          roughness: 0.3,
-          metalness: 0.85
-        });
-        const stepMesh = new THREE.Mesh(stepGeo, stepMat);
-        stepMesh.position.set(stepX, stepY, 0);
+          // Black Iron Bracket Stud on outer face
+          const studGeo = new THREE.CylinderGeometry(0.06, 0.06, 0.08, 6);
+          const studMat = new THREE.MeshStandardMaterial({
+            color: 0x101114,
+            roughness: 0.35,
+            metalness: 0.85
+          });
+          const stud = new THREE.Mesh(studGeo, studMat);
+          stud.rotation.x = Math.PI / 2;
+          stud.position.set(0, currentH / 2 - 0.14, 1.22);
+          stepMesh.add(stud);
 
-        // Edge wireframe
-        const wire = new THREE.LineSegments(
-          new THREE.EdgesGeometry(stepGeo),
-          new THREE.LineBasicMaterial({ color: stairNeonColor, linewidth: 1.5, transparent: true, opacity: 0.85 })
-        );
-        stepMesh.add(wire);
+          stairGroup.add(stepMesh);
+        }
 
-        // 2. Glowing Tread Lip Neon Runner (Top-front edge)
-        const runnerGeo = new THREE.BoxGeometry(stepW * 0.96, 0.08, 0.18);
-        const runnerMat = new THREE.MeshBasicMaterial({ color: stairNeonColor });
-        const runner = new THREE.Mesh(runnerGeo, runnerMat);
-        runner.position.set(0, currentH / 2 + 0.04, 1.15);
-        stepMesh.add(runner);
-        stepRunners.push(runner);
+        stairGroup.userData = {
+          obstacle: obs,
+          isGothic: true,
+          steps: numSteps,
+          stepW: stepW,
+          stepH: stepH,
+          dir: dir
+        };
+        this.stairMeshes.push(stairGroup);
+        this.obstaclesGroup.add(stairGroup);
+      } else {
+        // 🪜 Premium 3D Multi-Tier Architectural Staircase with LED Light Runners
+        const stairBaseColor = isFairyland ? 0x1a0d28 : (isShark ? 0x071b2c : 0x090f1d);
+        const stairNeonColor = isFairyland ? 0x00ff88 : (isShark ? 0x00e5ff : 0xd500f9);
 
-        // 3. Illuminated Riser Panel on vertical face
-        const riserGeo = new THREE.PlaneGeometry(stepW * 0.85, Math.max(0.2, stepH * 0.7));
-        const riserMat = new THREE.MeshBasicMaterial({
-          color: stairNeonColor,
-          transparent: true,
-          opacity: 0.28,
-          side: THREE.DoubleSide
-        });
-        const riser = new THREE.Mesh(riserGeo, riserMat);
-        riser.position.set(0, currentH / 2 - stepH / 2, 1.21);
-        stepMesh.add(riser);
-        riserPanels.push(riser);
+        const stepRunners = [];
+        const riserPanels = [];
 
-        stairGroup.add(stepMesh);
+        for (let i = 0; i < numSteps; i++) {
+          const stepIdx = (dir === "down") ? (numSteps - 1 - i) : i;
+          const currentH = (stepIdx + 1) * stepH;
+          const stepX = x + i * stepW + stepW / 2;
+          const stepY = y + currentH / 2;
+
+          // 1. Step Base Body
+          const stepGeo = new THREE.BoxGeometry(stepW, currentH, 2.4);
+          const stepMat = new THREE.MeshStandardMaterial({
+            color: stairBaseColor,
+            roughness: 0.3,
+            metalness: 0.85
+          });
+          const stepMesh = new THREE.Mesh(stepGeo, stepMat);
+          stepMesh.position.set(stepX, stepY, 0);
+
+          // Edge wireframe
+          const wire = new THREE.LineSegments(
+            new THREE.EdgesGeometry(stepGeo),
+            new THREE.LineBasicMaterial({ color: stairNeonColor, linewidth: 1.5, transparent: true, opacity: 0.85 })
+          );
+          stepMesh.add(wire);
+
+          // 2. Glowing Tread Lip Neon Runner (Top-front edge)
+          const runnerGeo = new THREE.BoxGeometry(stepW * 0.96, 0.08, 0.18);
+          const runnerMat = new THREE.MeshBasicMaterial({ color: stairNeonColor });
+          const runner = new THREE.Mesh(runnerGeo, runnerMat);
+          runner.position.set(0, currentH / 2 + 0.04, 1.15);
+          stepMesh.add(runner);
+          stepRunners.push(runner);
+
+          // 3. Illuminated Riser Panel on vertical face
+          const riserGeo = new THREE.PlaneGeometry(stepW * 0.85, Math.max(0.2, stepH * 0.7));
+          const riserMat = new THREE.MeshBasicMaterial({
+            color: stairNeonColor,
+            transparent: true,
+            opacity: 0.28,
+            side: THREE.DoubleSide
+          });
+          const riser = new THREE.Mesh(riserGeo, riserMat);
+          riser.position.set(0, currentH / 2 - stepH / 2, 1.21);
+          stepMesh.add(riser);
+          riserPanels.push(riser);
+
+          stairGroup.add(stepMesh);
+        }
+
+        stairGroup.userData = {
+          obstacle: obs,
+          runners: stepRunners,
+          risers: riserPanels,
+          neonColor: stairNeonColor,
+          steps: numSteps,
+          stepW: stepW,
+          stepH: stepH,
+          dir: dir,
+          pulseOffset: Math.random() * Math.PI * 2
+        };
+        this.stairMeshes.push(stairGroup);
+        this.obstaclesGroup.add(stairGroup);
       }
-
-      stairGroup.userData = {
-        obstacle: obs,
-        runners: stepRunners,
-        risers: riserPanels,
-        neonColor: stairNeonColor,
-        steps: numSteps,
-        stepW: stepW,
-        stepH: stepH,
-        dir: dir,
-        pulseOffset: Math.random() * Math.PI * 2
-      };
-      this.stairMeshes.push(stairGroup);
-      this.obstaclesGroup.add(stairGroup);
     }
     else if (type === "fan" || type === "aero_fan") {
       // 🌪️ High-Tech Aerodynamic Updraft Turbine Rig
@@ -1678,7 +1947,264 @@ export class GameRenderer {
   }
 
   createVictoryGate(endX) {
-    this.createInductorCoil(endX);
+    if (this.currentLevel && this.currentLevel.themeType === 'gothic') {
+      this.createGothicSanctuaryGate(endX);
+    } else {
+      this.createInductorCoil(endX);
+    }
+  }
+
+  // ═════════════════════════════════════════════════════════════════
+  // 🏰 GOTHIC CASTLE LIVING ENVIRONMENT ARCHITECTURE & CLIMAX
+  // ═════════════════════════════════════════════════════════════════
+
+  buildGothicFloorDetails(groundLength) {
+    // 1. Continuous Weathered Stone Parapet Coping
+    const parapetGeo = new THREE.BoxGeometry(groundLength, 0.28, 0.45);
+    const parapetMat = new THREE.MeshStandardMaterial({
+      color: 0x22252e,
+      roughness: 0.9,
+      metalness: 0.15
+    });
+    const parapetMesh = new THREE.Mesh(parapetGeo, parapetMat);
+    parapetMesh.position.set(groundLength / 2 - 20, 0.14, 2.45);
+    this.trackGroup.add(parapetMesh);
+    this.gothicFloorMeshes.push(parapetMesh);
+
+    // 2. Corbel Support Arches under the walkway edge every 14 units
+    const corbelGeo = new THREE.BoxGeometry(0.8, 1.6, 0.9);
+    const corbelMat = new THREE.MeshStandardMaterial({
+      color: 0x181a20,
+      roughness: 0.92,
+      metalness: 0.1
+    });
+
+    const numCorbels = Math.floor(groundLength / 14);
+    for (let c = 0; c < numCorbels; c++) {
+      const cx = -10 + c * 14;
+      const corbel = new THREE.Mesh(corbelGeo, corbelMat);
+      corbel.position.set(cx, -1.0, 2.4);
+      this.trackGroup.add(corbel);
+      this.gothicFloorMeshes.push(corbel);
+    }
+
+    // 3. Wall Sconce Torch Braziers every 18 units along the track edge
+    const torchCount = Math.floor(groundLength / 18);
+    for (let t = 0; t < torchCount; t++) {
+      const tx = -5 + t * 18;
+      const torchGroup = new THREE.Group();
+      torchGroup.position.set(tx, 0.2, 2.5);
+
+      // Iron Bracket Post
+      const postGeo = new THREE.CylinderGeometry(0.05, 0.05, 0.8, 6);
+      const postMat = new THREE.MeshStandardMaterial({ color: 0x101114, roughness: 0.4, metalness: 0.85 });
+      const post = new THREE.Mesh(postGeo, postMat);
+      post.position.y = 0.4;
+      torchGroup.add(post);
+
+      // Iron Bowl / Cup
+      const cupGeo = new THREE.ConeGeometry(0.18, 0.22, 6);
+      const cupMat = new THREE.MeshStandardMaterial({ color: 0x18191d, roughness: 0.5, metalness: 0.8 });
+      const cup = new THREE.Mesh(cupGeo, cupMat);
+      cup.rotation.x = Math.PI;
+      cup.position.y = 0.8;
+      torchGroup.add(cup);
+
+      // Animated Flame Mesh
+      const flameGeo = new THREE.ConeGeometry(0.14, 0.42, 6);
+      const flameMat = new THREE.MeshBasicMaterial({
+        color: 0xff4d15,
+        transparent: true,
+        opacity: 0.92
+      });
+      const flame = new THREE.Mesh(flameGeo, flameMat);
+      flame.position.y = 1.0;
+      flame.userData = {
+        isTorchFlame: true,
+        speed: 12.0 + Math.random() * 8.0,
+        offset: Math.random() * Math.PI * 2
+      };
+      torchGroup.add(flame);
+      this.gothicFloorMeshes.push(flame);
+
+      this.trackGroup.add(torchGroup);
+      this.gothicFloorMeshes.push(torchGroup);
+    }
+  }
+
+  createGothicSanctuaryGate(endX) {
+    this.gothicSanctuaryGate = new THREE.Group();
+    this.gothicSanctuaryGate.position.set(endX, 0, 0);
+
+    const stoneMat = new THREE.MeshStandardMaterial({
+      color: 0x181a22,
+      roughness: 0.9,
+      metalness: 0.15
+    });
+    const darkIronMat = new THREE.MeshStandardMaterial({
+      color: 0x101114,
+      roughness: 0.4,
+      metalness: 0.88
+    });
+
+    // 1. Massive Twin Gothic Buttress Pylons
+    const pylonGeo = new THREE.BoxGeometry(2.0, 9.5, 2.0);
+    const pylonL = new THREE.Mesh(pylonGeo, stoneMat);
+    pylonL.position.set(0, 4.75, -3.2);
+    const pylonR = new THREE.Mesh(pylonGeo, stoneMat);
+    pylonR.position.set(0, 4.75, 3.2);
+    this.gothicSanctuaryGate.add(pylonL);
+    this.gothicSanctuaryGate.add(pylonR);
+
+    // Pylon spires on top
+    const spireGeo = new THREE.ConeGeometry(1.2, 3.2, 4);
+    const spireL = new THREE.Mesh(spireGeo, stoneMat);
+    spireL.position.set(0, 11.1, -3.2);
+    spireL.rotation.y = Math.PI / 4;
+    const spireR = new THREE.Mesh(spireGeo, stoneMat);
+    spireR.position.set(0, 11.1, 3.2);
+    spireR.rotation.y = Math.PI / 4;
+    this.gothicSanctuaryGate.add(spireL);
+    this.gothicSanctuaryGate.add(spireR);
+
+    // 2. Pointed Gothic Arch Transom
+    const archBarGeo = new THREE.BoxGeometry(1.6, 1.2, 6.8);
+    const archBar = new THREE.Mesh(archBarGeo, stoneMat);
+    archBar.position.set(0, 8.8, 0);
+    this.gothicSanctuaryGate.add(archBar);
+
+    // Gothic Arch Apex Spire & Crest
+    const crestGeo = new THREE.ConeGeometry(0.9, 2.4, 4);
+    const crest = new THREE.Mesh(crestGeo, stoneMat);
+    crest.position.set(0, 10.6, 0);
+    crest.rotation.y = Math.PI / 4;
+    this.gothicSanctuaryGate.add(crest);
+
+    // 3. Forged Iron Portcullis Grille (Partially raised)
+    const portcullisGroup = new THREE.Group();
+    portcullisGroup.position.set(0, 6.4, 0);
+    for (let bar = -2; bar <= 2; bar++) {
+      const barGeo = new THREE.CylinderGeometry(0.07, 0.07, 4.2, 6);
+      const barMesh = new THREE.Mesh(barGeo, darkIronMat);
+      barMesh.position.z = bar * 1.0;
+      portcullisGroup.add(barMesh);
+
+      // Pointed pike tip at bottom of bar
+      const tipGeo = new THREE.ConeGeometry(0.12, 0.45, 4);
+      const tip = new THREE.Mesh(tipGeo, darkIronMat);
+      tip.rotation.x = Math.PI;
+      tip.position.set(0, -2.3, bar * 1.0);
+      portcullisGroup.add(tip);
+    }
+    this.gothicSanctuaryGate.add(portcullisGroup);
+
+    // 4. Abyssal Rift Void Portal inside the archway
+    const riftGeo = new THREE.CircleGeometry(2.8, 32);
+    const riftMat = new THREE.MeshBasicMaterial({
+      color: 0x12030d,
+      side: THREE.DoubleSide,
+      transparent: true,
+      opacity: 0.92
+    });
+    const riftDisc = new THREE.Mesh(riftGeo, riftMat);
+    riftDisc.rotation.y = -Math.PI / 2;
+    riftDisc.position.set(0.1, 4.2, 0);
+    this.gothicSanctuaryGate.add(riftDisc);
+
+    // Arcane crimson outer ring
+    const riftRimGeo = new THREE.TorusGeometry(2.85, 0.16, 12, 36);
+    const riftRimMat = new THREE.MeshBasicMaterial({ color: 0x8a1538 });
+    const riftRim = new THREE.Mesh(riftRimGeo, riftRimMat);
+    riftRim.rotation.y = -Math.PI / 2;
+    riftRim.position.set(0.1, 4.2, 0);
+    this.gothicSanctuaryGate.add(riftRim);
+
+    // 5. Twin Grand Braziers Flanking the Gate
+    const braziers = [];
+    [-3.2, 3.2].forEach((bz, bIdx) => {
+      const bzGroup = new THREE.Group();
+      bzGroup.position.set(-1.4, 0, bz);
+
+      const bzBowlGeo = new THREE.CylinderGeometry(0.7, 0.4, 0.9, 8);
+      const bzBowl = new THREE.Mesh(bzBowlGeo, darkIronMat);
+      bzBowl.position.y = 0.45;
+      bzGroup.add(bzBowl);
+
+      const bzFlameGeo = new THREE.ConeGeometry(0.55, 1.8, 8);
+      const bzFlameMat = new THREE.MeshBasicMaterial({
+        color: 0xc41230,
+        transparent: true,
+        opacity: 0.92
+      });
+      const bzFlame = new THREE.Mesh(bzFlameGeo, bzFlameMat);
+      bzFlame.position.y = 1.6;
+      bzGroup.add(bzFlame);
+
+      braziers.push({ mesh: bzFlame, offset: bIdx * 2.5 });
+      this.gothicSanctuaryGate.add(bzGroup);
+    });
+
+    this.gothicSanctuaryGate.userData = {
+      riftDisc: riftDisc,
+      riftRim: riftRim,
+      flames: braziers
+    };
+
+    this.trackGroup.add(this.gothicSanctuaryGate);
+  }
+
+  setCinematicFreeze(frozen) {
+    this.isCinematicFrozen = !!frozen;
+    if (this.sceneryManager && typeof this.sceneryManager.setCinematicFreeze === 'function') {
+      this.sceneryManager.setCinematicFreeze(frozen);
+    }
+  }
+
+  triggerGothicEndingBoom(x, y) {
+    this.cameraTrauma = 1.0;
+
+    // Flash background sky lightning
+    if (this.sceneryManager && typeof this.sceneryManager.triggerGothicLightningStrike === 'function') {
+      this.sceneryManager.triggerGothicLightningStrike(2.0);
+    }
+
+    // Spawn 50 high-velocity fortress masonry shrapnel shards
+    const colors = [0x1a1c22, 0x2d3038, 0x111215, 0x3d414d, 0x8a1538, 0xc41230];
+    for (let i = 0; i < 50; i++) {
+      const geo = (Math.random() > 0.4)
+        ? new THREE.BoxGeometry(0.3 + Math.random() * 0.4, 0.3 + Math.random() * 0.4, 0.3 + Math.random() * 0.4)
+        : new THREE.TetrahedronGeometry(0.25 + Math.random() * 0.35);
+      const mat = new THREE.MeshStandardMaterial({
+        color: colors[Math.floor(Math.random() * colors.length)],
+        roughness: 0.85,
+        metalness: 0.25
+      });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.set(x + (Math.random() - 0.5) * 1.8, y + (Math.random() - 0.5) * 1.8, (Math.random() - 0.5) * 2.5);
+
+      const angle = Math.random() * Math.PI * 2;
+      const speed = 14.0 + Math.random() * 26.0;
+      const vx = Math.cos(angle) * speed;
+      const vy = Math.abs(Math.sin(angle)) * speed * 0.95 + 4.0;
+      const vz = (Math.random() - 0.5) * 14.0;
+      const maxLife = 1.2 + Math.random() * 0.9;
+
+      this.scene.add(mesh);
+      this.gothicBoomParticles.push({
+        mesh: mesh,
+        vx: vx,
+        vy: vy,
+        vz: vz,
+        rx: (Math.random() - 0.5) * 20.0,
+        ry: (Math.random() - 0.5) * 20.0,
+        life: maxLife,
+        maxLife: maxLife
+      });
+    }
+
+    // Expanding shockwave rings on track
+    this.triggerShockwave(x, y, 0x8a1538, 6.5);
+    this.triggerShockwave(x, y, 0xffffff, 4.5);
   }
 
   // ⚡ Start Relativistic Inductor Coil Warp Transition
@@ -2758,6 +3284,68 @@ export class GameRenderer {
     }
   }
 
+  // 🌋 Screen Shake and Subterranean Tremor Engine
+  triggerScreenShake(intensity = 1.0, duration = 0.4) {
+    this.cameraShakeIntensity = Math.max(this.cameraShakeIntensity || 0, intensity);
+    this.cameraShakeTimer = Math.max(this.cameraShakeTimer || 0, duration);
+    this.cameraTrauma = Math.min(1.0, (this.cameraTrauma || 0) + intensity * 0.35);
+  }
+
+  // 🧱 Unstable Gothic Platform Vibrations & Crumbling
+  shakeUnstableBlock(obs, duration = 0.38) {
+    if (!this.unstableBlocks) return;
+    const b = this.unstableBlocks.get(obs);
+    if (!b) return;
+    b.shake = 1.0;
+    b.shakeTimer = duration;
+    const centerX = obs.x + (obs.w || 2) / 2;
+    const topY = obs.y + (obs.h || 2);
+    this.triggerStoneCrumble(centerX, topY);
+  }
+
+  dropUnstableBlock(obs) {
+    if (!this.unstableBlocks) return;
+    const b = this.unstableBlocks.get(obs);
+    if (!b) return;
+    b.shake = 0;
+    b.falling = true;
+    b.vy = -3.5;
+    b.rotVel = (Math.random() - 0.5) * 5.0;
+    const centerX = obs.x + (obs.w || 2) / 2;
+    const centerY = obs.y + (obs.h || 2) / 2;
+    this.triggerStoneShatter(centerX, centerY);
+  }
+
+  resetUnstableBlocks() {
+    if (!this.unstableBlocks) return;
+    this.unstableBlocks.forEach((b) => {
+      b.falling = false;
+      b.shake = 0;
+      b.shakeTimer = 0;
+      b.vy = 0;
+      b.rotVel = 0;
+      if (b.mesh) {
+        b.mesh.position.set(b.initialX, b.initialY, b.initialZ);
+        b.mesh.rotation.z = 0;
+        b.mesh.visible = true;
+      }
+    });
+  }
+
+  triggerStoneCrumble(x, y) {
+    if (this.triggerShockwave) {
+      this.triggerShockwave(x, y, 0x8b1025, 1.8);
+    }
+    this.triggerScreenShake(0.55, 0.25);
+  }
+
+  triggerStoneShatter(x, y) {
+    if (this.triggerShockwave) {
+      this.triggerShockwave(x, y, 0xc41230, 3.4);
+    }
+    this.triggerScreenShake(1.3, 0.42);
+  }
+
   // ⚡ High-Performance Screen Flash Overlay & WebGL Lighting Flare
   triggerScreenFlash(duration = 0.35, colorHex = 0xffffff) {
     const flashEl = document.getElementById('screen-flash');
@@ -3087,6 +3675,46 @@ export class GameRenderer {
     const { x, y, z, vy, rotationZ, vehicleMode, gravityDir, isGrounded, isAlive, isThrusting, isCoilTransition, coilProgress } = playerState;
     const time = this.clock.getElapsedTime();
 
+    // 🏰 Cinematic Freeze for Gothic Castle Climax Ending
+    if (this.isCinematicFrozen) {
+      let camShakeX = 0, camShakeY = 0;
+      if (this.cameraTrauma > 0) {
+        this.cameraTrauma = Math.max(0, this.cameraTrauma - dt * 2.2);
+        const shakeMag = this.cameraTrauma * this.cameraTrauma * 1.2;
+        camShakeX = (Math.random() - 0.5) * shakeMag;
+        camShakeY = (Math.random() - 0.5) * shakeMag;
+      }
+      this.camera.position.x = x + 4.5 + camShakeX;
+      this.camera.position.y = (y || 2.0) * 0.4 + 4.2 + camShakeY;
+      this.camera.lookAt(x + 5.5, this.camera.position.y * 0.85 + 0.5, 0);
+
+      // Update gothic ending explosion shrapnel debris
+      if (this.gothicBoomParticles && this.gothicBoomParticles.length > 0) {
+        for (let i = this.gothicBoomParticles.length - 1; i >= 0; i--) {
+          const p = this.gothicBoomParticles[i];
+          p.life -= dt;
+          if (p.life <= 0) {
+            this.scene.remove(p.mesh);
+            p.mesh.geometry.dispose();
+            p.mesh.material.dispose();
+            this.gothicBoomParticles.splice(i, 1);
+          } else {
+            p.mesh.position.x += p.vx * dt;
+            p.mesh.position.y += p.vy * dt;
+            p.mesh.position.z += p.vz * dt;
+            p.vy -= 22.0 * dt;
+            p.mesh.rotation.x += p.rx * dt;
+            p.mesh.rotation.y += p.ry * dt;
+            const s = Math.max(0.01, p.life / p.maxLife);
+            p.mesh.scale.set(s, s, s);
+          }
+        }
+      }
+
+      this.renderer.render(this.scene, this.camera);
+      return;
+    }
+
     // 1. Vehicle Switching
     if (this.currentVehicle !== vehicleMode) {
       this.currentVehicle = vehicleMode;
@@ -3296,13 +3924,29 @@ export class GameRenderer {
     if (this.isCoilTransition) {
       this.updateCoilTransition(dt, time, playerState);
     } else {
-      // 8. Dynamic Camera Follow with Trauma Screen Shake
+      // 8. Dynamic Camera Follow with Trauma Screen Shake & Cataclysm Tremors
       let camShakeX = 0, camShakeY = 0;
       if (this.cameraTrauma > 0) {
         this.cameraTrauma = Math.max(0, this.cameraTrauma - dt * 2.2);
         const shakeMag = this.cameraTrauma * this.cameraTrauma * 0.8;
-        camShakeX = (Math.random() - 0.5) * shakeMag;
-        camShakeY = (Math.random() - 0.5) * shakeMag;
+        camShakeX += (Math.random() - 0.5) * shakeMag;
+        camShakeY += (Math.random() - 0.5) * shakeMag;
+      }
+
+      if (this.cameraShakeTimer > 0) {
+        this.cameraShakeTimer -= dt;
+        const sMag = this.cameraShakeIntensity;
+        camShakeX += (Math.random() - 0.5) * sMag;
+        camShakeY += (Math.random() - 0.5) * sMag;
+      }
+
+      // Subterranean continuous tremor during Gothic Castle Collapse (progressRatio >= 0.85)
+      const isGothic = (this.currentLevel && (this.currentLevel.themeType === 'gothic' || this.currentLevel.id === 1));
+      const progRatio = this.currentLevel ? Math.max(0, Math.min(1, x / this.currentLevel.endX)) : 0;
+      if (isGothic && progRatio >= 0.85) {
+        const cataclysmTremor = ((progRatio - 0.85) / 0.15) * 0.14;
+        camShakeX += (Math.random() - 0.5) * cataclysmTremor;
+        camShakeY += (Math.random() - 0.5) * cataclysmTremor;
       }
 
       const targetCameraY = y * 0.4 + (gravityDir < 0 ? 6.5 : 4.2);
@@ -3329,6 +3973,72 @@ export class GameRenderer {
     if (this.sceneryManager) {
       const progressRatio = this.currentLevel ? Math.max(0, Math.min(1, x / this.currentLevel.endX)) : 0;
       this.sceneryManager.update(x, progressRatio, time, dt);
+
+      // 🏰 Dynamic Gothic Castle Living Environment Updates
+      if (this.currentLevel && this.currentLevel.themeType === 'gothic') {
+        // 1. Unstable Collapsing Platforms Tremor in Section 5 (progressRatio >= 0.82)
+        // 1. Unstable Collapsing Platforms Tremor & Plunge in Section 5 (progressRatio >= 0.82)
+        if (this.unstableBlocks && this.unstableBlocks.size > 0) {
+          const isFrozen = (this.sceneryManager && this.sceneryManager.isFrozen);
+          const isTrembling = (progressRatio >= 0.82);
+          const tremor = isTrembling ? Math.min(1.0, (progressRatio - 0.82) / 0.16) : 0;
+          const ambientShakeAmp = 0.08 * tremor;
+
+          this.unstableBlocks.forEach((b) => {
+            if (isFrozen) return;
+
+            if (b.falling) {
+              b.vy -= 42.0 * dt;
+              b.mesh.position.y += b.vy * dt;
+              b.mesh.rotation.z += b.rotVel * dt;
+              if (b.mesh.position.y < -25) {
+                b.mesh.visible = false;
+              }
+            } else if (b.shake > 0) {
+              b.shakeTimer -= dt;
+              if (b.shakeTimer <= 0) {
+                b.shake = 0;
+              }
+              const sx = (Math.random() - 0.5) * 0.28;
+              const sy = (Math.random() - 0.5) * 0.22;
+              b.mesh.position.set(b.initialX + sx, b.initialY + sy, b.initialZ);
+            } else if (isTrembling) {
+              const u = b.mesh.userData || {};
+              const phase = u.jitterPhase || 0;
+              const sx = Math.sin(time * 35.0 + phase) * ambientShakeAmp;
+              const sy = Math.sin(time * 42.0 + phase * 1.3) * (ambientShakeAmp * 0.7);
+              b.mesh.position.set(b.initialX + sx, b.initialY + sy, b.initialZ);
+            }
+          });
+        }
+
+        // 2. Animate Wall Sconce Torch Flames with Act Progression
+        if (this.gothicFloorMeshes && this.gothicFloorMeshes.length > 0) {
+          this.gothicFloorMeshes.forEach(m => {
+            if (m.userData && m.userData.isTorchFlame) {
+              const u = m.userData;
+              const baseScale = progressRatio < 0.2 ? 0.35 : (progressRatio < 0.45 ? 0.75 : 1.0);
+              const flicker = 0.85 + Math.sin(time * u.speed + u.offset) * 0.2;
+              const s = baseScale * flicker;
+              m.scale.set(s, s * 1.25, s);
+            }
+          });
+        }
+
+        // 3. Animate Gothic Sanctuary Gate Rift Void & Braziers
+        if (this.gothicSanctuaryGate && this.gothicSanctuaryGate.userData) {
+          const gData = this.gothicSanctuaryGate.userData;
+          if (gData.riftDisc) {
+            gData.riftDisc.rotation.z -= dt * 2.2;
+          }
+          if (gData.flames) {
+            gData.flames.forEach(fl => {
+              const s = 0.85 + Math.sin(time * 16.0 + fl.offset) * 0.2;
+              fl.mesh.scale.set(s, s * 1.35, s);
+            });
+          }
+        }
+      }
     }
 
     // 9. Dynamic Track Underglow
@@ -3545,6 +4255,29 @@ export class GameRenderer {
 
     // 10c. ⚡ Update 3D Inductor Coil Animations (Rotors, Lightning Arcs & Pulse Rings)
     this.updateInductorCoil(dt, time);
+
+    // 10d. 🏰 Update Gothic Ending Explosion Shrapnel
+    if (this.gothicBoomParticles && this.gothicBoomParticles.length > 0) {
+      for (let i = this.gothicBoomParticles.length - 1; i >= 0; i--) {
+        const p = this.gothicBoomParticles[i];
+        p.life -= dt;
+        if (p.life <= 0) {
+          this.scene.remove(p.mesh);
+          p.mesh.geometry.dispose();
+          p.mesh.material.dispose();
+          this.gothicBoomParticles.splice(i, 1);
+        } else {
+          p.mesh.position.x += p.vx * dt;
+          p.mesh.position.y += p.vy * dt;
+          p.mesh.position.z += p.vz * dt;
+          p.vy -= 22.0 * dt;
+          p.mesh.rotation.x += p.rx * dt;
+          p.mesh.rotation.y += p.ry * dt;
+          const s = Math.max(0.01, p.life / p.maxLife);
+          p.mesh.scale.set(s, s, s);
+        }
+      }
+    }
 
     // 11. Render Frame
     this.renderer.render(this.scene, this.camera);

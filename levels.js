@@ -8,13 +8,13 @@ export const LEVEL_DATA = [
     themeType: "gothic",
     difficulty: "Hard",
     diffStars: "4★",
-    diffColor: "#FF0055",
+    diffColor: "#C41230",
     bpm: 142,
     theme: 1,
     speed: 11.0,
     endX: 420,
     defaultVehicle: "cube",
-    desc: "Haunting gothic fortress! Creepy pipe organ music, battlement rampart stairs, boiling brimstone lava moats, and high-lift aero fans.",
+    desc: "Ominous gothic fortress! Living environment with rain, creeping fog, igniting torches, arcane energy surges, lightning storms, and a collapsing finale.",
     obstacles: [
       // ═════════════════════════════════════════════════════════════════
       // ACT I: COURTYARD ENTRANCE & BATTLEMENT RAMPARTS (x: 0 – 90)
@@ -25,7 +25,7 @@ export const LEVEL_DATA = [
       // 🪜 Gothic Rampart Ascending Stairs (Smooth step-up to Y=1.5)
       { type: "stairs", x: 34, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
       { type: "block",  x: 37.6, y: 0, w: 5.0, h: 1.5 },
-      { type: "gem",    x: 40.0, y: 3.2, subType: "ruby", color: 0xff0055, value: 100 },
+      { type: "gem",    x: 40.0, y: 3.2, subType: "ruby", color: 0xc41230, value: 100 },
       // Descending Stairs back to courtyard
       { type: "stairs", x: 42.6, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
 
@@ -33,7 +33,7 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 47.5, y: 0, w: 3.2, height: 8.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
       // 🌋 Molten Lava Lake across the chasm
       { type: "lava",   x: 50.0, y: 0, w: 9.0, h: 0.8 },
-      { type: "gem",    x: 54.0, y: 5.5, subType: "ruby", color: 0xff0055, value: 100 },
+      { type: "gem",    x: 54.0, y: 5.5, subType: "ruby", color: 0xc41230, value: 100 },
       // High Battlement Landing
       { type: "block",  x: 58.0, y: 0, w: 10.0, h: 2.5 },
       { type: "spike",  x: 65.0, y: 2.5, dir: "up" },
@@ -51,7 +51,7 @@ export const LEVEL_DATA = [
       // 🌋 Boiling Magma Chasm with mid-air save orb
       { type: "lava",   x: 93.0, y: 0, w: 12.0, h: 0.8 },
       { type: "orb",    x: 98.5, y: 5.0, subType: "yellow" },
-      { type: "gem",    x: 98.5, y: 6.2, subType: "ruby", color: 0xff0055, value: 100 },
+      { type: "gem",    x: 98.5, y: 6.2, subType: "ruby", color: 0xc41230, value: 100 },
       // 🌋 Floating Volcanic Basalt Stepping Platform
       { type: "lava_crust", x: 104.0, y: 0, w: 7.0, h: 2.0 },
       // 🌋 Active Magma Bubble Hazard Block
@@ -71,11 +71,11 @@ export const LEVEL_DATA = [
       { type: "lava",   x: 172.0, y: 0, w: 16.0, h: 0.8 },
       { type: "orb",    x: 176.0, y: 3.0, subType: "yellow" },
       { type: "orb",    x: 183.0, y: 3.5, subType: "yellow" },
-      { type: "gem",    x: 183.0, y: 5.2, subType: "ruby", color: 0xff0055, value: 100 },
+      { type: "gem",    x: 183.0, y: 5.2, subType: "ruby", color: 0xc41230, value: 100 },
       { type: "lava_crust", x: 190.0, y: 0, w: 8.0, h: 2.0 },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT III: GRAND BELFRY DROP & ORGAN SOLO (x: 210 – 320)
+      // ACT III: GRAND BELFRY DROP & ORGAN SOLO (x: 210 – 300)
       // ═════════════════════════════════════════════════════════════════
       // 🌪️ Castle Belfry Aero Fan Launch (Drop / Organ Solo!)
       { type: "fan",    x: 204.0, y: 2.0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
@@ -94,12 +94,12 @@ export const LEVEL_DATA = [
       { type: "speed_gate",   x: 266.0, y: 0, speedMult: 2.0 },
       { type: "pad",    x: 272.0, y: 0, subType: "yellow" },
       { type: "block",  x: 277.0, y: 0, w: 7.0, h: 2.5 },
-      { type: "gem",    x: 280.0, y: 4.8, subType: "ruby", color: 0xff0055, value: 100 },
+      { type: "gem",    x: 280.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
       { type: "spike",  x: 286.0, y: 0, dir: "up" },
       { type: "block",  x: 290.0, y: 0, w: 6.0, h: 1.5 },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT IV: ROYAL THRONE ROOM FINISH (x: 320 – 420)
+      // ACT IV: LIGHTNING STORM RAMPARTS (x: 300 – 355)
       // ═════════════════════════════════════════════════════════════════
       // 🪜 Throne Room Grand Stairs
       { type: "stairs", x: 308.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
@@ -109,8 +109,26 @@ export const LEVEL_DATA = [
       // 🌪️ Final Royal Brimstone Aero Fan over Boiling Lava River
       { type: "fan",    x: 326.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
       { type: "lava",   x: 329.0, y: 0, w: 14.0, h: 0.8 },
-      { type: "lava_crust", x: 343.0, y: 0, w: 10.0, h: 1.5 }
-      // High-Power 3D Inductor Coil Transition Gate awaits at endX: 420!
+      { type: "lava_crust", x: 343.0, y: 0, w: 10.0, h: 1.5 },
+
+      // ═════════════════════════════════════════════════════════════════
+      // ACT V: THE COLLAPSING SANCTUARY & UNSTABLE ESCAPE (x: 355 – 420)
+      // ═════════════════════════════════════════════════════════════════
+      // Spires toppling, stone debris raining, platforms trembling!
+      { type: "block",  x: 356.0, y: 0, w: 7.0, h: 1.5, unstable: true },
+      { type: "spike",  x: 361.0, y: 1.5, dir: "up" },
+      { type: "pad",    x: 364.0, y: 0, subType: "yellow" },
+      { type: "block",  x: 368.0, y: 2.0, w: 9.0, h: 1.5, unstable: true },
+      { type: "gem",    x: 372.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "spike",  x: 375.0, y: 3.5, dir: "up" },
+      { type: "lava",   x: 378.0, y: 0, w: 14.0, h: 0.8 },
+      { type: "orb",    x: 382.0, y: 4.0, subType: "yellow" },
+      { type: "block",  x: 386.0, y: 1.8, w: 8.0, h: 1.5, unstable: true },
+      { type: "pad",    x: 391.0, y: 3.3, subType: "yellow" },
+      { type: "block",  x: 396.0, y: 3.6, w: 8.0, h: 1.2, unstable: true },
+      { type: "stairs", x: 405.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
+      { type: "block",  x: 410.0, y: 0, w: 9.0, h: 1.5, unstable: true }
+      // The Grand Ruined Sanctuary Gate & Time Freeze awaits at endX: 420!
     ]
   },
 
