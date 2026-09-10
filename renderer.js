@@ -232,57 +232,138 @@ export class GameRenderer {
     });
   }
 
-  // 🌋 High-Performance Animated Procedural Magma Texture Canvas
+  // 🌋 High-Performance GPU Animated Procedural Magma Shader
+  createLavaShaderMaterial(lavaW) {
+    return new THREE.ShaderMaterial({
+      uniforms: {
+        uTime: { value: 0 },
+        uScale: { value: new THREE.Vector2(Math.max(1.0, (lavaW || 8.0) / 3.2), 1.0) },
+        uColorHot: { value: new THREE.Color(0xfff5aa) },     // Incandescent white-yellow core
+        uColorOrange: { value: new THREE.Color(0xff4a00) },  // Intense fiery orange
+        uColorRed: { value: new THREE.Color(0xa80a00) },     // Deep boiling magma crimson
+        uColorCrust: { value: new THREE.Color(0x140604) }    // Dark cooling basalt crust
+      },
+      vertexShader: `
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+        uniform float uTime;
+        void main() {
+          vUv = uv;
+          vec3 pos = position;
+          // Gentle molten undulating fluid swell
+          float wave = sin(pos.x * 2.2 + uTime * 2.6) * cos(pos.y * 2.0 + uTime * 2.0) * 0.035;
+          pos.z += wave;
+          vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+        uniform float uTime;
+        uniform vec2 uScale;
+        uniform vec3 uColorHot;
+        uniform vec3 uColorOrange;
+        uniform vec3 uColorRed;
+        uniform vec3 uColorCrust;
+        varying vec2 vUv;
+        varying vec3 vWorldPos;
+
+        vec2 hash22(vec2 p) {
+          p = vec2(dot(p, vec2(127.1, 311.7)), dot(p, vec2(269.5, 183.3)));
+          return -1.0 + 2.0 * fract(sin(p) * 43758.5453123);
+        }
+
+        float pNoise(vec2 p) {
+          vec2 pi = floor(p);
+          vec2 pf = fract(p);
+          vec2 w = pf * pf * (3.0 - 2.0 * pf);
+          return mix(
+            mix(dot(hash22(pi + vec2(0.0, 0.0)), pf - vec2(0.0, 0.0)),
+                dot(hash22(pi + vec2(1.0, 0.0)), pf - vec2(1.0, 0.0)), w.x),
+            mix(dot(hash22(pi + vec2(0.0, 1.0)), pf - vec2(0.0, 1.0)),
+                dot(hash22(pi + vec2(1.0, 1.0)), pf - vec2(1.0, 1.0)), w.x),
+            w.y);
+        }
+
+        float fbm(vec2 p) {
+          float v = 0.0;
+          v += 0.500 * pNoise(p);
+          v += 0.250 * pNoise(p * 2.02 + vec2(1.7, 9.2));
+          v += 0.125 * pNoise(p * 4.02 + vec2(8.3, 2.8));
+          return v;
+        }
+
+        float voronoiCrust(vec2 p) {
+          vec2 ip = floor(p);
+          vec2 fp = fract(p);
+          float d = 4.0;
+          for (int y = -1; y <= 1; y++) {
+            for (int x = -1; x <= 1; x++) {
+              vec2 g = vec2(float(x), float(y));
+              vec2 o = hash22(ip + g) * 0.45 + 0.5;
+              vec2 delta = g + o - fp;
+              float dist = dot(delta, delta);
+              if (dist < d) d = dist;
+            }
+          }
+          return sqrt(d);
+        }
+
+        void main() {
+          vec2 uv = vUv * uScale;
+          float t = uTime * 0.35;
+
+          // Molten convection currents
+          vec2 convection = vec2(
+            fbm(uv * 1.2 + vec2(t * 0.4, -t * 0.2)),
+            fbm(uv * 1.2 + vec2(-t * 0.2, t * 0.3))
+          );
+          vec2 flowUv = uv + convection * 0.45;
+
+          // Heat intensity from multi-octave noise
+          float heat1 = fbm(flowUv * 1.8 + vec2(t * 0.3, 0.0));
+          float heat2 = fbm(flowUv * 3.6 - vec2(0.0, t * 0.4));
+          float heat = (heat1 * 0.65 + heat2 * 0.35) * 0.5 + 0.5;
+
+          // Cooling cellular basalt crust
+          float vDist = voronoiCrust(flowUv * 1.4 + convection * 0.15);
+          float crustMask = smoothstep(0.12, 0.38, vDist);
+          float fissureGlow = 1.0 - smoothstep(0.0, 0.18, vDist);
+
+          // Liquid magma colors
+          vec3 col = uColorRed;
+          col = mix(col, uColorOrange, smoothstep(0.30, 0.65, heat));
+          col = mix(col, uColorHot, smoothstep(0.65, 0.95, heat));
+
+          // Dark cooling crust plates on cell centers
+          col = mix(col, uColorCrust, crustMask * 0.82);
+
+          // Searing incandescent yellow-white fissures
+          col += uColorHot * fissureGlow * 1.8;
+          col += uColorOrange * (1.0 - crustMask) * 0.45;
+
+          // Dynamic heat glow pulsing
+          float pulse = 0.94 + 0.06 * sin(uTime * 4.0 + uv.x * 3.0);
+          col *= pulse;
+
+          // Edge vignette blend into basalt basin
+          float edgeX = smoothstep(0.0, 0.03, vUv.x) * smoothstep(1.0, 0.97, vUv.x);
+          float edgeY = smoothstep(0.0, 0.06, vUv.y) * smoothstep(1.0, 0.94, vUv.y);
+          col = mix(uColorCrust * 0.5, col, edgeX * edgeY);
+
+          gl_FragColor = vec4(col, 1.0);
+        }
+      `,
+      side: THREE.DoubleSide
+    });
+  }
+
   setupLavaTexture() {
-    this.lavaCanvas = document.createElement('canvas');
-    this.lavaCanvas.width = 128;
-    this.lavaCanvas.height = 64;
-    this.lavaCtx = this.lavaCanvas.getContext('2d');
-    this.lavaTexture = new THREE.CanvasTexture(this.lavaCanvas);
-    this.lavaTexture.wrapS = THREE.RepeatWrapping;
-    this.lavaTexture.wrapT = THREE.RepeatWrapping;
-    this.lavaTexture.repeat.set(2, 1);
-    this.updateLavaTexture(0);
+    // Retained for backward compatibility
   }
 
   updateLavaTexture(time) {
-    if (!this.lavaCtx) return;
-    const ctx = this.lavaCtx;
-    const w = 128, h = 64;
-    const imgData = ctx.createImageData(w, h);
-    const data = imgData.data;
-
-    for (let y = 0; y < h; y++) {
-      for (let x = 0; x < w; x++) {
-        const nx = x * 0.085;
-        const ny = y * 0.12;
-        const v1 = Math.sin(nx + time * 2.2);
-        const v2 = Math.sin(ny - time * 1.8);
-        const v3 = Math.sin((nx + ny) * 0.8 + time * 3.0);
-        const v = (v1 + v2 + v3 + 3) / 6.0;
-
-        const idx = (y * w + x) * 4;
-        if (v < 0.42) {
-          const t = v / 0.42;
-          data[idx] = Math.floor(180 + t * 75);
-          data[idx + 1] = Math.floor(20 + t * 70);
-          data[idx + 2] = Math.floor(5 + t * 15);
-        } else if (v < 0.78) {
-          const t = (v - 0.42) / 0.36;
-          data[idx] = 255;
-          data[idx + 1] = Math.floor(90 + t * 130);
-          data[idx + 2] = Math.floor(20 + t * 40);
-        } else {
-          const t = (v - 0.78) / 0.22;
-          data[idx] = 255;
-          data[idx + 1] = Math.floor(220 + t * 35);
-          data[idx + 2] = Math.floor(60 + t * 195);
-        }
-        data[idx + 3] = 255;
-      }
-    }
-    ctx.putImageData(imgData, 0, 0);
-    this.lavaTexture.needsUpdate = true;
+    // GPU ShaderMaterial handles all lava updates with zero CPU overhead
   }
 
   setupLighting() {
@@ -1358,7 +1439,7 @@ export class GameRenderer {
       this.obstaclesGroup.add(fanGroup);
     }
     else if (type === "lava" || type === "lava_pit") {
-      // 🌋 Dynamic Molten Lava Lake with Churning Magma Canvas & Volcanic Basalt Rocks
+      // 🌋 Dynamic Molten Lava Lake with High-Performance GPU Magma Shader & Volcanic Basalt Rocks
       const lavaGroup = new THREE.Group();
       const lavaW = obs.w || 8.0;
       const lavaH = obs.h || 0.8;
@@ -1381,18 +1462,20 @@ export class GameRenderer {
       );
       basin.add(basinWire);
 
-      // 2. Molten Liquid Lava Surface Plane with Procedural Animated Magma Texture
-      const lavaGeo = new THREE.PlaneGeometry(lavaW, 2.6, Math.max(4, Math.floor(lavaW)), 4);
-      const lavaMat = new THREE.MeshBasicMaterial({
-        map: this.lavaTexture,
-        side: THREE.DoubleSide
-      });
+      // 2. Molten Liquid Lava Surface Plane with Procedural Animated Magma Shader
+      const lavaGeo = new THREE.PlaneGeometry(lavaW, 2.6, Math.max(8, Math.floor(lavaW * 2)), 6);
+      const lavaMat = this.createLavaShaderMaterial(lavaW);
       const lavaSurface = new THREE.Mesh(lavaGeo, lavaMat);
       lavaSurface.rotation.x = -Math.PI / 2;
       lavaSurface.position.set(x + lavaW / 2, y + lavaH, 0);
       lavaGroup.add(lavaSurface);
 
-      // 3. Shimmering Atmospheric Heat Haze Layer
+      // 3. Volcanic Furnace Point Light Glow (Casts atmospheric orange warmth)
+      const lavaLight = new THREE.PointLight(0xff4500, 1.6, Math.max(10, lavaW * 1.2), 1.5);
+      lavaLight.position.set(x + lavaW / 2, y + lavaH + 0.6, 0.6);
+      lavaGroup.add(lavaLight);
+
+      // 4. Shimmering Atmospheric Heat Haze Layer
       const hazeGeo = new THREE.PlaneGeometry(lavaW, 2.6);
       const hazeMat = new THREE.MeshBasicMaterial({
         color: 0xff4500,
@@ -1405,7 +1488,7 @@ export class GameRenderer {
       haze.position.set(x + lavaW / 2, y + lavaH + 0.12, 0);
       lavaGroup.add(haze);
 
-      // 4. Floating Volcanic Obsidian Crust Islands
+      // 5. Floating Volcanic Obsidian Crust Islands
       const crustCount = Math.max(1, Math.floor(lavaW / 3.5));
       const crusts = [];
       for (let c = 0; c < crustCount; c++) {
@@ -1419,16 +1502,27 @@ export class GameRenderer {
         const cx = x + 1.2 + c * (lavaW / crustCount);
         crust.position.set(cx, y + lavaH + 0.02, (Math.random() - 0.5) * 0.8);
         crust.userData = { bobPhase: Math.random() * Math.PI * 2, baseX: cx, baseY: y + lavaH + 0.02 };
+
+        const cWire = new THREE.LineSegments(
+          new THREE.EdgesGeometry(cGeo),
+          new THREE.LineBasicMaterial({ color: 0xff4500, linewidth: 1.5 })
+        );
+        crust.add(cWire);
         crusts.push(crust);
         lavaGroup.add(crust);
       }
 
-      // 5. Active Magma Bubbles on Surface
+      // 6. Active Magma Bubbles on Surface with Emissive Core
       const bubbleCount = Math.max(2, Math.floor(lavaW / 2.5));
       const bubbles = [];
       for (let b = 0; b < bubbleCount; b++) {
         const bGeo = new THREE.SphereGeometry(0.24, 12, 10, 0, Math.PI * 2, 0, Math.PI * 0.5);
-        const bMat = new THREE.MeshBasicMaterial({ color: 0xffdd00 });
+        const bMat = new THREE.MeshStandardMaterial({
+          color: 0xff3700,
+          emissive: 0xffaa00,
+          emissiveIntensity: 1.4,
+          roughness: 0.25
+        });
         const bubble = new THREE.Mesh(bGeo, bMat);
         const bx = x + 0.8 + b * (lavaW / bubbleCount) + (Math.random() - 0.5) * 0.6;
         bubble.position.set(bx, y + lavaH, (Math.random() - 0.5) * 1.2);
@@ -1444,6 +1538,8 @@ export class GameRenderer {
       lavaGroup.userData = {
         obstacle: obs,
         surface: lavaSurface,
+        shaderMaterial: lavaMat,
+        light: lavaLight,
         haze: haze,
         crusts: crusts,
         bubbles: bubbles,
@@ -4350,14 +4446,16 @@ export class GameRenderer {
       }
     });
 
-    // 10f. 🌋 Molten Lava Churning Magma Canvas & Active Magma Bubbles
+    // 10f. 🌋 Molten Lava Glowing Magma Shader & Active Magma Bubbles
     if (this.lavaMeshes.length > 0) {
-      if (!this.lastLavaTextureTime || (performance.now() - this.lastLavaTextureTime > 35)) {
-        this.lastLavaTextureTime = performance.now();
-        this.updateLavaTexture(time);
-      }
       this.lavaMeshes.forEach(lava => {
         const u = lava.userData;
+        if (u.shaderMaterial && u.shaderMaterial.uniforms && u.shaderMaterial.uniforms.uTime) {
+          u.shaderMaterial.uniforms.uTime.value = time;
+        }
+        if (u.light) {
+          u.light.intensity = 1.4 + Math.sin(time * 3.8 + (u.baseX || 0)) * 0.35;
+        }
         if (u.crusts) {
           u.crusts.forEach(crust => {
             crust.position.y = crust.userData.baseY + Math.sin(time * 3.2 + crust.userData.bobPhase) * 0.04;
