@@ -33,7 +33,7 @@ export const LEVEL_DATA = [
       // 🌪️ Castle Brimstone Moat Aero Fan Launch over Boiling Lava Lake
       { type: "fan",    x: 76.0, y: 0, w: 3.2, height: 8.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
       // 🌋 Molten Lava Lake across the chasm
-      { type: "lava",   x: 80.0, y: 0, w: 10.0, h: 0.8 },
+      { type: "lava",   x: 79.2, y: 0, w: 11.0, h: 0.8 },
       { type: "gem",    x: 85.0, y: 5.5, subType: "ruby", color: 0xc41230, value: 100 },
       // High Battlement Landing Platform
       { type: "block",  x: 90.0, y: 0, w: 14.0, h: 2.5 },
@@ -53,8 +53,8 @@ export const LEVEL_DATA = [
       // 🪜 Gargoyle Tower Stepped Ascent
       { type: "stairs", x: 188.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.6, dir: "up", subType: "gothic" },
       { type: "pad",    x: 194.0, y: 2.4, subType: "yellow" }, // Launches over double moat!
-      // 🌋 Boiling Magma Chasm with mid-air save orb
-      { type: "lava",   x: 198.0, y: 0, w: 16.0, h: 0.8 },
+      // 🌋 Boiling Magma Chasm with mid-air save orb & floating basalt crust
+      { type: "lava",   x: 198.0, y: 0, w: 28.0, h: 0.8 },
       { type: "orb",    x: 206.0, y: 5.0, subType: "yellow" },
       { type: "gem",    x: 206.0, y: 6.2, subType: "ruby", color: 0xc41230, value: 100 },
       // 🌋 Floating Volcanic Basalt Stepping Platform
@@ -73,7 +73,7 @@ export const LEVEL_DATA = [
       { type: "spike",  x: 292.0, y: 2.5, dir: "up" },
 
       // Blood Orb Chains across Magma Rift
-      { type: "lava",   x: 304.0, y: 0, w: 18.0, h: 0.8 },
+      { type: "lava",   x: 304.0, y: 0, w: 36.0, h: 0.8 },
       { type: "orb",    x: 310.0, y: 3.2, subType: "yellow" },
       { type: "orb",    x: 320.0, y: 3.8, subType: "yellow" },
       { type: "gem",    x: 320.0, y: 5.4, subType: "ruby", color: 0xc41230, value: 100 },
@@ -89,38 +89,38 @@ export const LEVEL_DATA = [
       { type: "fan",    x: 374.0, y: 0, w: 3.2, height: 8.5, liftForce: 125.0, maxLiftVy: 17.5, subType: "magma" },
       // Stepped Belfry Descent
       { type: "stairs", x: 392.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "down", subType: "gothic" },
-
-      // Flying Belfry Stepped Pyramids
+      { type: "spike",  x: 404.0, y: 0, dir: "up" },
       { type: "stairs", x: 418.0, y: 0, steps: 3, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
-      { type: "block",  x: 421.6, y: 0, w: 8.0, h: 1.5 },
-      { type: "orb",    x: 434.0, y: 3.4, subType: "yellow" },
+      { type: "pad",    x: 426.0, y: 1.5, subType: "yellow" },
       { type: "lava_crystal", x: 433.0, y: 0, dir: "up" },
-      { type: "block",  x: 440.0, y: 0, w: 8.0, h: 1.5 },
-
-      // High Gothic Spires into Speed Gate 2x (Pipe Organ Solo!)
+      { type: "pad",    x: 442.0, y: 0, subType: "yellow" },
+      { type: "spike",  x: 448.0, y: 0, dir: "up" },
       { type: "lava_crystal", x: 456.0, y: 0, dir: "up" },
-      { type: "speed_gate",   x: 466.0, y: 0, speedMult: 2.0 },
-      { type: "pad",    x: 476.0, y: 0, subType: "yellow" },
-      { type: "block",  x: 483.0, y: 0, w: 12.0, h: 2.5 },
-      { type: "gem",    x: 488.0, y: 5.0, subType: "ruby", color: 0xc41230, value: 100 },
-      { type: "spike",  x: 498.0, y: 2.5, dir: "up" },
-      { type: "block",  x: 508.0, y: 0, w: 10.0, h: 1.5 },
+      { type: "orb",    x: 468.0, y: 3.8, subType: "yellow" },
+      { type: "gem",    x: 468.0, y: 5.2, subType: "ruby", color: 0xc41230, value: 100 },
+      { type: "shield", x: 486.0, y: 2.0 },
+      { type: "spike",  x: 498.0, y: 0, dir: "up" },
+      { type: "spike",  x: 512.0, y: 0, dir: "up" },
       { type: "lava_crystal", x: 524.0, y: 0, dir: "up" },
+      { type: "orb",    x: 538.0, y: 3.5, subType: "yellow" },
 
-      // 🚩 CHECKPOINT 3: TEMPEST BATTLEMENT GATE
-      { type: "checkpoint", x: 550.0, y: 0, respawnY: 0, title: "Tempest Ramparts Gate" },
+      // 🚩 CHECKPOINT 3: ROYAL BATTLEMENT CROWN
+      { type: "checkpoint", x: 550.0, y: 0, respawnY: 0, title: "Royal Battlement Crown" },
 
       // ═════════════════════════════════════════════════════════════════
-      // ACT IV: LIGHTNING STORM RAMPARTS (x: 550 – 705)
+      // ACT IV: LIGHTNING RAMPARTS & THE STORM (x: 550 – 705)
       // ═════════════════════════════════════════════════════════════════
-      // 🪜 Throne Room Grand Stairs
+      // High Storm Battlement Ascent
       { type: "stairs", x: 566.0, y: 0, steps: 4, stepW: 1.2, stepH: 0.5, dir: "up", subType: "gothic" },
-      { type: "block",  x: 571.0, y: 0, w: 10.0, h: 2.0 },
+      { type: "block",  x: 571.0, y: 0, w: 12.0, h: 2.0 },
       { type: "spike",  x: 578.0, y: 2.0, dir: "up" },
+      { type: "pad",    x: 585.0, y: 2.0, subType: "yellow" },
+      { type: "orb",    x: 594.0, y: 5.2, subType: "yellow" },
+      { type: "gem",    x: 594.0, y: 6.6, subType: "ruby", color: 0xc41230, value: 100 },
 
       // 🌪️ Final Royal Brimstone Aero Fan over Boiling Lava River
       { type: "fan",    x: 606.0, y: 0, w: 3.2, height: 9.0, liftForce: 130.0, maxLiftVy: 17.5, subType: "magma" },
-      { type: "lava",   x: 610.0, y: 0, w: 22.0, h: 0.8 },
+      { type: "lava",   x: 610.0, y: 0, w: 40.0, h: 0.8 },
       { type: "orb",    x: 624.0, y: 5.5, subType: "yellow" },
       { type: "gem",    x: 624.0, y: 6.8, subType: "ruby", color: 0xc41230, value: 100 },
       { type: "lava_crust", x: 636.0, y: 0, w: 14.0, h: 1.8 },
@@ -134,14 +134,14 @@ export const LEVEL_DATA = [
       // ═════════════════════════════════════════════════════════════════
       // ACT V: THE COLLAPSING SANCTUARY & UNSTABLE ESCAPE (x: 705 – 840)
       // ═════════════════════════════════════════════════════════════════
-      // Spires toppling, stone debris raining, platforms trembling!
+      // Unstable crumbling platforms that shake and collapse when stepped upon!
       { type: "block",  x: 720.0, y: 0, w: 10.0, h: 1.5, unstable: true },
       { type: "spike",  x: 726.0, y: 1.5, dir: "up" },
       { type: "pad",    x: 732.0, y: 0, subType: "yellow" },
       { type: "block",  x: 742.0, y: 2.0, w: 12.0, h: 1.5, unstable: true },
       { type: "gem",    x: 748.0, y: 4.8, subType: "ruby", color: 0xc41230, value: 100 },
       { type: "spike",  x: 751.0, y: 3.5, dir: "up" },
-      { type: "lava",   x: 758.0, y: 0, w: 16.0, h: 0.8 },
+      { type: "lava",   x: 754.0, y: 0, w: 21.0, h: 0.8 },
       { type: "orb",    x: 766.0, y: 4.2, subType: "yellow" },
       { type: "block",  x: 775.0, y: 1.8, w: 10.0, h: 1.5, unstable: true },
       { type: "pad",    x: 786.0, y: 3.3, subType: "yellow" },

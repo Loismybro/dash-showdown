@@ -2195,13 +2195,32 @@ class GameManager {
                 continue;
               }
 
-              // 3. Seam between consecutive contiguous blocks
-              const isInternalSeam = this.level.obstacles.some(o => 
-                o.type === 'block' && o !== obs && !o._fallen &&
-                Math.abs((o.x + (o.w || 2)) - left) < 0.20 && 
-                o.y <= bottom + 0.2 && (o.y + (o.h || 2)) >= top - 0.2
-              );
+              // 3. Seam between consecutive contiguous blocks or stairs
+              const isInternalSeam = this.level.obstacles.some(o => {
+                if (o === obs || o._fallen) return false;
+                if (o.type === 'block') {
+                  return Math.abs((o.x + (o.w || 2)) - left) < 0.25 && 
+                         o.y <= bottom + 0.25 && (o.y + (o.h || 2)) >= top - 0.25;
+                }
+                if (o.type === 'stairs') {
+                  const sSteps = o.steps || 4;
+                  const sStepW = o.stepW || 1.2;
+                  const sStepH = o.stepH || 0.5;
+                  const stairEnd = o.x + sSteps * sStepW;
+                  const stairTop = (o.dir === 'down') ? (o.y + sStepH) : (o.y + sSteps * sStepH);
+                  // Ascending stairs leading into block left wall
+                  if (Math.abs(stairEnd - left) < 0.35 && Math.abs(stairTop - top) < 0.40) {
+                    return true;
+                  }
+                }
+                return false;
+              });
               if (isInternalSeam) {
+                if (p.gravityDir === 1 && p.y >= top - 0.60) {
+                  p.y = top;
+                  p.vy = 0;
+                  p.isGrounded = true;
+                }
                 continue;
               }
 
@@ -2235,12 +2254,30 @@ class GameManager {
                 continue;
               }
 
-              const isInternalSeam = this.level.obstacles.some(o => 
-                o.type === 'block' && o !== obs && !o._fallen &&
-                Math.abs((o.x + (o.w || 2)) - left) < 0.20 && 
-                o.y <= bottom + 0.2 && (o.y + (o.h || 2)) >= top - 0.2
-              );
+              const isInternalSeam = this.level.obstacles.some(o => {
+                if (o === obs || o._fallen) return false;
+                if (o.type === 'block') {
+                  return Math.abs((o.x + (o.w || 2)) - left) < 0.25 && 
+                         o.y <= bottom + 0.25 && (o.y + (o.h || 2)) >= top - 0.25;
+                }
+                if (o.type === 'stairs') {
+                  const sSteps = o.steps || 4;
+                  const sStepW = o.stepW || 1.2;
+                  const sStepH = o.stepH || 0.5;
+                  const stairEnd = o.x + sSteps * sStepW;
+                  const stairTop = (o.dir === 'down') ? (o.y - sStepH) : (o.y - sSteps * sStepH);
+                  if (Math.abs(stairEnd - left) < 0.35 && Math.abs(stairTop - bottom) < 0.40) {
+                    return true;
+                  }
+                }
+                return false;
+              });
               if (isInternalSeam) {
+                if (p.gravityDir === -1 && p.y + 1.0 <= bottom + 0.60) {
+                  p.y = bottom - 1.0;
+                  p.vy = 0;
+                  p.isGrounded = true;
+                }
                 continue;
               }
 
@@ -2295,7 +2332,8 @@ class GameManager {
         const sx = obs.x;
         const sy = obs.y;
 
-        if (px >= sx - 0.25 && px <= sx + totalW + 0.15) {
+        // Effective stairs horizontal footprint with step-up tolerance
+        if (px >= sx - 0.35 && px <= sx + totalW + 0.35) {
           const relX = Math.max(0, Math.min(totalW - 0.001, px - sx));
           const stepIdx = Math.floor(relX / stepW);
           const stepTop = (dir === 'down')
@@ -2306,8 +2344,16 @@ class GameManager {
             : sy + stepIdx * stepH;
 
           if (p.gravityDir === 1) {
-            // Smooth step climb & tread landing
-            if (p.y >= Math.min(prevStepTop, stepTop) - 0.55 && p.y <= Math.max(prevStepTop, stepTop) + 0.50) {
+            // Player lands or steps onto the tread:
+            // 1. Falling from above onto the tread
+            // 2. Climbing step-to-step smoothly
+            // 3. Approaching step 0 from floor level
+            const maxStepClimb = stepH + 0.30;
+            const canLand = (p.prevY >= stepTop - 0.25) || 
+                            (p.y >= stepTop - maxStepClimb) || 
+                            (p.y >= sy - 0.15 && p.y <= stepTop + 0.55);
+
+            if (canLand) {
               if (!p.isGrounded) {
                 audio.playMechanicalLanding();
                 this.renderer.triggerLandingSquash();
@@ -2317,22 +2363,21 @@ class GameManager {
               p.y = stepTop;
               p.vy = 0;
               p.isGrounded = true;
+
               if (dir === 'down') {
                 const targetVx = (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0);
                 p.vx = Math.min(targetVx * 1.22, p.vx + 7.5 * 0.016);
               }
-            } else if (px > sx + 0.12 && p.y < stepTop - 0.60 && p.y > sy - 0.3) {
-              if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
-                this.onPlayerCrash();
-                return;
-              }
+            } else if (p.vehicleMode === 'wave') {
+              this.onPlayerCrash();
+              return;
             }
           } else {
             // Inverted gravity stair climbing
             const invTop = (dir === 'down')
               ? sy - (numSteps - stepIdx) * stepH
               : sy - (stepIdx + 1) * stepH;
-            if (p.y <= invTop + 0.50) {
+            if (p.y <= invTop + 0.60) {
               p.y = invTop - 1.0;
               p.vy = 0;
               p.isGrounded = true;
@@ -2340,72 +2385,21 @@ class GameManager {
           }
         }
       }
-      else if (obs.type === 'lava' || obs.type === 'lava_pit') {
-        const lavaW = obs.w || 8.0;
-        const lavaH = obs.h || 0.8;
-        if (px >= obs.x + 0.15 && px <= obs.x + lavaW - 0.15) {
-          const lavaSurface = obs.y + lavaH;
-          if (p.y <= lavaSurface - 0.05) {
-            this.onPlayerCrash('lava');
-            return;
-          } else if (!obs.nearMiss && p.y > lavaSurface - 0.05 && p.y <= lavaSurface + 0.25) {
-            obs.nearMiss = true;
-            audio.playLavaSizzle();
-            if (this.renderer) {
-              this.renderer.triggerScreenFlash(0.12);
-              this.renderer.emitSparkParticle(px, lavaSurface + 0.2);
-            }
-          }
-        }
-      }
-      else if (obs.type === 'lava_bubble') {
-        const bw = obs.w || 2.2;
-        const bh = obs.h || 1.4;
-        if (px >= obs.x - 0.28 && px <= obs.x + bw + 0.28) {
-          if (p.y >= obs.y - 0.2 && p.y <= obs.y + bh + 0.35) {
-            this.onPlayerCrash('lava');
-            return;
-          }
-        }
-      }
-      else if (obs.type === 'lava_crystal') {
-        const halfW = 0.36;
-        const dx = Math.abs(px - obs.x);
-        if (dx < halfW) {
-          const slopeRatio = (1.0 - dx / halfW);
-          if (obs.dir === 'down') {
-            const deadlyY = obs.y - slopeRatio * 0.80;
-            const playerTop = p.y + 0.90;
-            const playerBottom = p.y + 0.05;
-            if (playerTop > deadlyY && playerBottom < obs.y) {
-              this.onPlayerCrash('lava');
-              return;
-            }
-          } else {
-            const deadlyY = obs.y + slopeRatio * 0.80;
-            const playerTop = p.y + 0.95;
-            const playerBottom = p.y + 0.05;
-            if (playerBottom < deadlyY && playerTop > obs.y + 0.05) {
-              this.onPlayerCrash('lava');
-              return;
-            }
-          }
-        }
-      }
       else if (obs.type === 'lava_crust') {
+        // 🌋 Floating Volcanic Basalt Stepping Platform (Safe on top!)
         const cw = obs.w || 3.0;
         const ch = obs.h || 1.2;
         const left = obs.x;
         const right = obs.x + cw;
         const top = obs.y + ch;
-        const playerHalfW = 0.36;
+        const playerHalfW = 0.34;
         const playerLeft = px - playerHalfW;
         const playerRight = px + playerHalfW;
         const playerBottom = p.y;
         const playerTop = p.y + 1.0;
 
-        if (playerRight > left + 0.04 && playerLeft < right - 0.04 && playerTop > obs.y + 0.04 && playerBottom < top - 0.02) {
-          const isComingFromAbove = (p.prevY >= top - 0.28) || (p.y >= top - 0.45);
+        if (playerRight > left + 0.04 && playerLeft < right - 0.04 && playerTop > obs.y + 0.04 && playerBottom <= top + 0.15) {
+          const isComingFromAbove = (p.prevY >= top - 0.30) || (p.y >= top - 0.50);
           if (isComingFromAbove || (p.invulnerableTimer && p.invulnerableTimer > 0)) {
             if (!p.isGrounded) {
               audio.playMechanicalLanding();
@@ -2421,6 +2415,93 @@ class GameManager {
             p.y = top;
             p.vy = 0;
             p.isGrounded = true;
+          }
+        }
+      }
+      else if (obs.type === 'lava' || obs.type === 'lava_pit') {
+        const lavaW = obs.w || 8.0;
+        const lavaH = obs.h || 0.8;
+        const lavaLeft = obs.x;
+        const lavaRight = obs.x + lavaW;
+        const lavaSurface = obs.y + lavaH;
+
+        const playerHalfW = 0.32;
+        const pLeft = px - playerHalfW;
+        const pRight = px + playerHalfW;
+
+        if (pRight > lavaLeft + 0.10 && pLeft < lavaRight - 0.10) {
+          // Check if player is safely supported by a solid crust or block above the lava
+          const isSupportedBySolid = this.level.obstacles.some(solid => {
+            if (solid.type !== 'lava_crust' && solid.type !== 'block') return false;
+            const sw = solid.w || (solid.type === 'lava_crust' ? 3.0 : 2.0);
+            const sh = solid.h || (solid.type === 'lava_crust' ? 1.2 : 2.0);
+            const sLeft = solid.x;
+            const sRight = solid.x + sw;
+            const sTop = solid.y + sh;
+            if (pRight > sLeft + 0.04 && pLeft < sRight - 0.04) {
+              if (p.y >= sTop - 0.35 || p.prevY >= sTop - 0.35) {
+                return true;
+              }
+            }
+            return false;
+          });
+
+          if (isSupportedBySolid) {
+            continue;
+          }
+
+          if (p.y <= lavaSurface - 0.06) {
+            if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
+              this.onPlayerCrash('lava');
+              return;
+            }
+          } else if (!obs.nearMiss && p.y <= lavaSurface + 0.32) {
+            obs.nearMiss = true;
+            audio.playLavaSizzle();
+            if (this.renderer) {
+              this.renderer.triggerScreenFlash(0.12);
+              this.renderer.emitSparkParticle(px, lavaSurface + 0.2);
+            }
+          }
+        }
+      }
+      else if (obs.type === 'lava_bubble') {
+        const bw = obs.w || 2.2;
+        const bh = obs.h || 1.4;
+        if (px >= obs.x - 0.28 && px <= obs.x + bw + 0.28) {
+          if (p.y >= obs.y - 0.2 && p.y <= obs.y + bh + 0.35) {
+            if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
+              this.onPlayerCrash('lava');
+              return;
+            }
+          }
+        }
+      }
+      else if (obs.type === 'lava_crystal') {
+        const halfW = 0.36;
+        const dx = Math.abs(px - obs.x);
+        if (dx < halfW) {
+          const slopeRatio = (1.0 - dx / halfW);
+          if (obs.dir === 'down') {
+            const deadlyY = obs.y - slopeRatio * 0.80;
+            const playerTop = p.y + 0.90;
+            const playerBottom = p.y + 0.05;
+            if (playerTop > deadlyY && playerBottom < obs.y) {
+              if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
+                this.onPlayerCrash('lava');
+                return;
+              }
+            }
+          } else {
+            const deadlyY = obs.y + slopeRatio * 0.80;
+            const playerTop = p.y + 0.95;
+            const playerBottom = p.y + 0.05;
+            if (playerBottom < deadlyY && playerTop > obs.y + 0.05) {
+              if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
+                this.onPlayerCrash('lava');
+                return;
+              }
+            }
           }
         }
       }
