@@ -581,6 +581,7 @@ class GameManager {
   }
 
   resetPlayer(isFullReset = false) {
+    this.physicsAccumulator = 0;
     if (isFullReset) {
       this.attempts = 1;
       this.checkpoints = [];
@@ -3467,11 +3468,13 @@ class GameManager {
   // -------------------------------------------------------------
 
   gameLoop(currentTime) {
-    const dt = Math.min(0.033, (currentTime - this.lastTime) / 1000);
+    if (!this.lastTime) this.lastTime = currentTime;
+    const frameDt = Math.min(0.1, (currentTime - this.lastTime) / 1000);
     this.lastTime = currentTime;
 
     // A. Main Menu State: Gently drift ambient 3D camera without gameplay physics
     if (this.gameState === 'MENU') {
+      this.physicsAccumulator = 0;
       this.renderer.update({
         x: 0,
         y: (this.player.vehicleMode === 'cube' ? 0.5 : 0),
@@ -3482,13 +3485,14 @@ class GameManager {
         isGrounded: true,
         isAlive: true,
         isThrusting: false
-      }, dt * 0.35);
+      }, frameDt * 0.35);
       requestAnimationFrame(t => this.gameLoop(t));
       return;
     }
 
     // B. Paused / Smurf Cat State: Completely freeze game loop, physics & animations
     if (this.gameState === 'PAUSED' || this.gameState === 'SMURF_CAT') {
+      this.physicsAccumulator = 0;
       this.renderer.update({
         x: this.player.x,
         y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
@@ -3506,6 +3510,7 @@ class GameManager {
 
     // C. Gothic Climax Ending State: Everything frozen in space, camera shake & shockwave
     if (this.gameState === 'GOTHIC_CLIMAX') {
+      this.physicsAccumulator = 0;
       this.renderer.update({
         x: this.player.x,
         y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
@@ -3522,14 +3527,27 @@ class GameManager {
         isThrusting: false,
         isCoilTransition: false,
         coilProgress: 0
-      }, dt);
+      }, frameDt);
       requestAnimationFrame(t => this.gameLoop(t));
       return;
     }
 
-    // 1. Update Player Physics & Collisions
-    this.updatePhysics(dt);
-    this.updateStyleDecay(dt);
+    // 1. Fixed-Timestep Physics Accumulator Loop (120Hz deterministic sub-stepping)
+    const FIXED_PHYSICS_DT = 1 / 120;
+    this.physicsAccumulator = (this.physicsAccumulator || 0) + frameDt;
+    let subSteps = 0;
+    const maxSubSteps = 8;
+    while (this.physicsAccumulator >= FIXED_PHYSICS_DT && subSteps < maxSubSteps) {
+      this.updatePhysics(FIXED_PHYSICS_DT);
+      this.physicsAccumulator -= FIXED_PHYSICS_DT;
+      subSteps++;
+      if (!this.player.isAlive && this.gameState !== 'CRASHED') break;
+    }
+    if (this.physicsAccumulator > FIXED_PHYSICS_DT * 2) {
+      this.physicsAccumulator = 0;
+    }
+
+    this.updateStyleDecay(frameDt);
 
     // Living environment audio progression (Castle 5-act evolution)
     if (this.gameState === 'PLAYING' && this.level && this.level.endX) {
@@ -3540,18 +3558,18 @@ class GameManager {
     // 1b. Update Meme Chaos Timers (Tung Tung Sahur Random Event)
     if (this.gameState === 'PLAYING' && this.chaosMode !== 'off') {
       const interval = (this.chaosMode === 'high') ? 45 : 75;
-      this.tungTungTimer -= dt;
+      this.tungTungTimer -= frameDt;
       if (this.tungTungTimer <= 0 && this.player.isAlive) {
         this.triggerTungTungSahur();
         this.tungTungTimer = Math.random() * 15 + interval;
       }
     }
     if (this.nearMissCooldown > 0) {
-      this.nearMissCooldown -= dt;
+      this.nearMissCooldown -= frameDt;
     }
 
     // 2. Update AI Ghost Racers
-    this.updateGhosts(dt);
+    this.updateGhosts(frameDt);
 
     // 3. Update 3D Visuals & Camera with Dynamic Momentum State
     this.renderer.update({
@@ -3573,7 +3591,7 @@ class GameManager {
       isThrusting: this.player.isHolding,
       isCoilTransition: (this.gameState === 'COIL_TRANSITION'),
       coilProgress: this.coilProgress || 0
-    }, dt);
+    }, frameDt);
 
     // 4. Update HUD and Leaderboard
     this.updateHUD();
