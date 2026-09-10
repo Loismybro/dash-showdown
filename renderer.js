@@ -3520,11 +3520,14 @@ export class GameRenderer {
     }
   }
 
-  triggerDeathExplosion(pos, colorStr = "#00FF88") {
+  triggerDeathExplosion(pos, colorStr = "#00FF88", inheritedVx = 0, inheritedVy = 0) {
     this.isExploding = true;
     this.cameraTrauma = 1.0; // Max trauma shake
 
     this.triggerShockwave(pos.x, pos.y, 0xff0055, 4.5);
+
+    const fwdKick = (inheritedVx || 0) * 0.85;
+    const upKick = Math.max(0, (inheritedVy || 0) * 0.35);
 
     this.voxelPieces.forEach(p => {
       p.mesh.visible = true;
@@ -3533,27 +3536,29 @@ export class GameRenderer {
       p.mesh.material.color.set(colorStr);
       p.mesh.material.emissive.set(colorStr);
 
-      // Spherical radial explosion
+      // Spherical radial explosion combined with real forward momentum
       const theta = Math.random() * Math.PI * 2;
       const phi = Math.random() * Math.PI;
       const speed = Math.random() * 18 + 8;
       p.vel.set(
-        Math.cos(theta) * Math.sin(phi) * speed,
-        Math.sin(theta) * Math.sin(phi) * speed + 4,
+        Math.cos(theta) * Math.sin(phi) * speed * 0.6 + fwdKick,
+        Math.sin(theta) * Math.sin(phi) * speed + 4 + upKick,
         Math.cos(phi) * speed * 0.4
       );
-      p.rotVel.set(Math.random() * 15, Math.random() * 15, Math.random() * 15);
-      p.life = 0.55;
+      p.rotVel.set(Math.random() * 18, Math.random() * 18, Math.random() * 18);
+      p.life = 0.70;
     });
   }
 
   // 🌋 Fiery Volcanic Magma Incineration Death
-  triggerLavaDeath(pos) {
+  triggerLavaDeath(pos, inheritedVx = 0) {
     this.isExploding = true;
     this.cameraTrauma = 1.0;
 
     this.triggerShockwave(pos.x, pos.y, 0xff3700, 5.0);
     this.triggerScreenFlash(0.35);
+
+    const fwdKick = (inheritedVx || 0) * 0.75;
 
     this.voxelPieces.forEach((p, idx) => {
       p.mesh.visible = true;
@@ -3565,16 +3570,16 @@ export class GameRenderer {
       p.mesh.material.color.set(lavaColor);
       p.mesh.material.emissive.set(lavaColor);
 
-      // Upward thermal plume ejection
+      // Upward thermal plume ejection + forward momentum
       const angle = (Math.random() - 0.5) * Math.PI * 0.8;
       const speed = Math.random() * 16 + 10;
       p.vel.set(
-        Math.sin(angle) * speed,
+        Math.sin(angle) * speed * 0.6 + fwdKick,
         Math.cos(angle) * speed + 7,
         (Math.random() - 0.5) * 4
       );
       p.rotVel.set(Math.random() * 22, Math.random() * 22, Math.random() * 22);
-      p.life = 0.65;
+      p.life = 0.75;
     });
   }
 
@@ -3585,12 +3590,21 @@ export class GameRenderer {
       if (p.life > 0) {
         anyAlive = true;
         p.life -= dt;
+        p.vel.x *= Math.pow(0.50, dt); // Air drag on forward momentum
         p.vel.y -= 38 * dt; // Gravity
         p.pos.addScaledVector(p.vel, dt);
+
+        // Ground bounce & surface friction
+        if (p.pos.y <= 0.05) {
+          p.pos.y = 0.05;
+          p.vel.y = -p.vel.y * 0.38; // Bouncy debris
+          p.vel.x *= 0.75; // Ground friction bite
+        }
+
         p.mesh.position.copy(p.pos);
         p.mesh.rotation.x += p.rotVel.x * dt;
         p.mesh.rotation.y += p.rotVel.y * dt;
-        p.mesh.scale.setScalar(Math.max(0.01, p.life / 0.55));
+        p.mesh.scale.setScalar(Math.max(0.01, p.life / 0.70));
       } else {
         p.mesh.visible = false;
       }
@@ -4049,15 +4063,17 @@ export class GameRenderer {
       this.camera.position.z = 15.5;
       this.camera.lookAt(x + 5.5, this.camera.position.y * 0.85 + 0.5, 0);
 
-      // ⚡ Dynamic Hypersonic Speed Warp FOV Stretching
-      const speedMult = playerState.speedMult || 1.0;
-      const targetFov = this.defaultCameraFov + Math.max(0, (speedMult - 1.0) * 11.0);
-      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, 5.0 * dt);
+      // ⚡ Dynamic Hypersonic Speed & Momentum Warp FOV Stretching
+      const currentSpeed = playerState.vx || (this.currentLevel ? this.currentLevel.speed : 11.0);
+      const baseTrackSpeed = (this.currentLevel ? (this.currentLevel.baseSpeed || this.currentLevel.speed) : 11.0);
+      const momentumRatio = Math.max(0.8, currentSpeed / baseTrackSpeed);
+      const targetFov = this.defaultCameraFov + Math.max(0, (momentumRatio - 1.0) * 16.0);
+      this.camera.fov += (targetFov - this.camera.fov) * Math.min(1, 6.0 * dt);
       this.camera.updateProjectionMatrix();
     }
 
-    // 🚀 Update Hypersonic Warp Speed Streaks Tunnel System
-    const currentSpeedMult = playerState.speedMult || 1.0;
+    // 🚀 Update Hypersonic Warp Speed Streaks Tunnel System with Momentum
+    const currentSpeedMult = Math.max(playerState.speedMult || 1.0, (playerState.vx || 11.0) / ((this.currentLevel && this.currentLevel.speed) || 11.0));
     this.updateWarpSpeedStreaks(dt, currentSpeedMult, x, y);
 
     // ✨ Update Volumetric God Rays Light Shafts

@@ -771,7 +771,13 @@ class GameManager {
     }
 
     this.gameState = 'CRASHED';
-    this.respawnTimer = 0.42; // 0.42s snappy respawn
+    this.respawnTimer = 0.52; // Smooth 0.52s physics momentum slide before respawn
+
+    // 🚀 NEVER STOP INSTANTLY (velocity.x = 0): Impart continuous crash momentum!
+    const activeVx = this.player.vx || this.level.speed;
+    this.player.crashVx = Math.max(activeVx * 0.88, 7.0);
+    this.player.crashVy = Math.max(5.5 * this.player.gravityDir, (this.player.vy || 0) * 0.5 + 5.0 * this.player.gravityDir);
+    this.player.crashRotV = (this.player.crashVx * 0.85 + 10.0) * this.player.gravityDir;
 
     if (this.multiplayer) {
       this.multiplayer.sendCrashEvent(this.player.x, this.player.y);
@@ -785,7 +791,8 @@ class GameManager {
       audio.playLavaSizzle();
       if (this.renderer) {
         this.renderer.triggerLavaDeath(
-          new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0)
+          new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0),
+          this.player.crashVx
         );
         const lavaTexts = ["BOILING LAVA! 🌋", "INCINERATED! 🔥", "CRISPY! 💀", "EXTRA TOASTY! 🥓"];
         this.renderer.triggerComicHitText(
@@ -813,10 +820,12 @@ class GameManager {
         }
       }
 
-      // Trigger standard 3D shattered voxel explosion
+      // Trigger standard 3D shattered voxel explosion with inherited forward momentum
       this.renderer.triggerDeathExplosion(
         new THREE.Vector3(this.player.x, this.player.y + 0.5 * this.player.gravityDir, 0),
-        this.level.diffColor
+        this.level.diffColor,
+        this.player.crashVx,
+        this.player.crashVy
       );
     }
 
@@ -1606,16 +1615,20 @@ class GameManager {
             orbMesh.userData.triggerOrb();
           }
 
+          const targetVx = (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0);
           if (obs.subType === 'yellow') {
             p.vy = 18.5 * p.gravityDir;
+            p.vx = Math.max(p.vx + 2.5, targetVx * 1.12); // Forward aerial momentum kick!
             p.isGrounded = false;
           } else if (obs.subType === 'pink') {
             p.vy = 14.0 * p.gravityDir;
+            p.vx = Math.max(p.vx + 1.8, targetVx * 1.08);
             p.isGrounded = false;
           } else if (obs.subType === 'blue') {
             // Gravity Flip Orb!
             p.gravityDir *= -1;
             p.vy = (p.gravityDir === -1 ? 16.0 : -16.0);
+            p.vx = Math.max(p.vx + 2.2, targetVx * 1.10);
             p.isGrounded = false;
             audio.playGravityFlip(p.gravityDir < 0);
           }
@@ -1746,6 +1759,41 @@ class GameManager {
     if (this.gameState !== 'PLAYING' || !this.player.isAlive) {
       if (this.gameState === 'CRASHED') {
         this.respawnTimer -= dt;
+
+        // 🚀 CONTINUOUS CRASH MOMENTUM: Never stop instantly (velocity.x = 0)!
+        const p = this.player;
+        const ceilY = (this.level && this.level.ceilY) ? this.level.ceilY : 10.0;
+
+        // Smooth kinetic friction deceleration slide
+        p.crashVx = (p.crashVx || 0) * Math.pow(0.22, dt);
+        p.x += p.crashVx * dt;
+
+        // Gravity arc & ground/ceiling deflection bounce
+        p.crashVy = (p.crashVy || 0) - 38.0 * p.gravityDir * dt;
+        p.y += p.crashVy * dt;
+
+        if (p.gravityDir === 1 && p.y <= 0) {
+          p.y = 0;
+          p.crashVy = -p.crashVy * 0.38; // Rubber/metal bounce
+          p.crashVx *= 0.85; // Ground friction bite
+          if (this.renderer && Math.abs(p.crashVx) > 2.0) {
+            this.renderer.emitSparkParticle(p.x, 0.1);
+          }
+        } else if (p.gravityDir === -1 && p.y >= ceilY - 1.0) {
+          p.y = ceilY - 1.0;
+          p.crashVy = -p.crashVy * 0.38;
+          p.crashVx *= 0.85;
+          if (this.renderer && Math.abs(p.crashVx) > 2.0) {
+            this.renderer.emitSparkParticle(p.x, ceilY - 0.9);
+          }
+        }
+
+        p.rotationZ -= (p.crashRotV || 10.0) * dt;
+        p.crashRotV = (p.crashRotV || 10.0) * Math.pow(0.35, dt);
+
+        // Keep active player vx synchronized
+        p.vx = p.crashVx;
+
         if (this.respawnTimer <= 0) {
           this.resetPlayer(false);
         }
@@ -1827,8 +1875,23 @@ class GameManager {
       this.jumpBufferTimer -= dt;
     }
 
-    // 1. Horizontal Motion
-    p.x += this.level.speed * dt;
+    // 1. Horizontal Motion with Real Physical Momentum & Dynamic Inertia
+    const targetVx = (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0);
+    if (p.vx === undefined || isNaN(p.vx)) {
+      p.vx = targetVx;
+    }
+
+    if (p.vx < targetVx) {
+      // Crisp forward traction acceleration
+      const accelRate = p.isGrounded ? 32.0 : 18.0;
+      p.vx = Math.min(targetVx, p.vx + accelRate * dt);
+    } else if (p.vx > targetVx) {
+      // Surplus momentum preservation! (Air preserves speed much longer than ground)
+      const dragRate = p.isGrounded ? 4.5 : 2.2;
+      p.vx = Math.max(targetVx, p.vx - (p.vx - targetVx) * dragRate * dt);
+    }
+
+    p.x += p.vx * dt;
 
     // 2. Check auto-trigger orbs while holding
     if (p.isHolding) {
@@ -1864,10 +1927,15 @@ class GameManager {
           p.isGrounded = false;
           audio.playAeroFanLift(0.45);
 
+          // Tailwind forward momentum assist!
+          p.vx = Math.min(targetVx * 1.35, p.vx + 16.0 * dt);
+
           // Interactive Aero Boost on Jump press inside wind column
           if (this.jumpBufferTimer > 0) {
             this.jumpBufferTimer = 0;
             p.vy = (maxVy + 2.5) * p.gravityDir;
+            // Massive forward momentum boost!
+            p.vx = Math.max(p.vx + 4.2, targetVx * 1.25);
             audio.playAeroBoost();
             if (this.renderer) {
               const boostColor = (obs.subType === 'magma' ? 0xff4500 : (obs.subType === 'emerald' ? 0x00ff88 : 0x00f0ff));
@@ -2249,6 +2317,10 @@ class GameManager {
               p.y = stepTop;
               p.vy = 0;
               p.isGrounded = true;
+              if (dir === 'down') {
+                const targetVx = (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0);
+                p.vx = Math.min(targetVx * 1.22, p.vx + 7.5 * 0.016);
+              }
             } else if (px > sx + 0.12 && p.y < stepTop - 0.60 && p.y > sy - 0.3) {
               if (!p.invulnerableTimer || p.invulnerableTimer <= 0) {
                 this.onPlayerCrash();
@@ -2384,16 +2456,20 @@ class GameManager {
               this.renderer.sceneryManager.triggerObstacleFlash(obs.subType === 'pink' ? 0xff007f : (obs.subType === 'blue' ? 0x00f0ff : 0xffd000), 0.75);
             }
 
+            const targetVx = (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0);
             if (obs.subType === 'yellow') {
               p.vy = 24.0 * p.gravityDir;
+              p.vx = Math.max(p.vx + 3.2, targetVx * 1.18); // Forward launch momentum kick!
               p.isGrounded = false;
               audio.playPadLaunch();
             } else if (obs.subType === 'pink') {
               p.vy = 15.0 * p.gravityDir;
+              p.vx = Math.max(p.vx + 2.0, targetVx * 1.10);
               p.isGrounded = false;
               audio.playPadLaunch();
             } else if (obs.subType === 'blue') {
-              // Proper gravity flip launch!
+              // Proper gravity flip launch with momentum surge!
+              p.vx = Math.max(p.vx + 2.6, targetVx * 1.14);
               if (p.gravityDir === 1) {
                 p.gravityDir = -1;
                 p.vy = 22.0; // Launches UP to ceiling
@@ -2445,6 +2521,7 @@ class GameManager {
           if (this.currentSpeedMult !== obs.speedMult) {
             this.currentSpeedMult = obs.speedMult;
             this.level.speed = (this.level.baseSpeed || 11.0) * obs.speedMult;
+            p.vx = Math.max(p.vx, this.level.speed * 1.15); // Dynamic momentum surge!
             audio.playSpeedGate(obs.speedMult);
             if (this.renderer) {
               if (this.renderer.triggerShockwave) {
@@ -2705,11 +2782,13 @@ class GameManager {
     // Update procedural music progression across the 5 acts
     audio.setTrackProgression(progress / 100);
 
-    // Real-Time Speedometer Refresh
+    // Real-Time Speedometer Refresh with Dynamic Momentum
     const speedEl = document.getElementById('speedometer-val');
     if (speedEl) {
-      const mach = (this.level.speed / 11.0).toFixed(1);
-      const mode = this.currentSpeedMult >= 2.0 ? 'WARP DRIVE' : (this.currentSpeedMult >= 1.5 ? 'HYPER DRIVE' : (this.currentSpeedMult < 1.0 ? 'SLOW-MO' : 'CRUISING'));
+      const activeSpeed = (this.gameState === 'CRASHED' ? (this.player.crashVx || 0) : (this.player.vx || this.level.speed));
+      const mach = (activeSpeed / 11.0).toFixed(1);
+      const isSurging = activeSpeed > ((this.level.speed || 11.0) * (this.currentSpeedMult || 1.0) * 1.04);
+      const mode = isSurging ? 'MOMENTUM SURGE ⚡' : (this.currentSpeedMult >= 2.0 ? 'WARP DRIVE' : (this.currentSpeedMult >= 1.5 ? 'HYPER DRIVE' : (this.currentSpeedMult < 1.0 ? 'SLOW-MO' : 'CRUISING')));
       speedEl.innerHTML = `⚡ MACH <span>${mach}</span> • ${mode}`;
     }
 
@@ -3393,11 +3472,13 @@ class GameManager {
     // 2. Update AI Ghost Racers
     this.updateGhosts(dt);
 
-    // 3. Update 3D Visuals & Camera
+    // 3. Update 3D Visuals & Camera with Dynamic Momentum State
     this.renderer.update({
       x: this.player.x,
       y: this.player.y + (this.player.vehicleMode === 'cube' ? 0.5 : 0),
       z: this.player.z || 0,
+      vx: (this.gameState === 'CRASHED' ? (this.player.crashVx || 0) : (this.player.vx || this.level.speed)),
+      targetVx: (this.level.speed || 11.0) * (this.currentSpeedMult || 1.0),
       vy: this.player.vy,
       rotationZ: this.player.rotationZ,
       vehicleMode: this.player.vehicleMode,
@@ -3407,6 +3488,7 @@ class GameManager {
       speedMult: this.currentSpeedMult || 1.0,
       isGrounded: this.player.isGrounded,
       isAlive: this.player.isAlive,
+      isCrashing: (this.gameState === 'CRASHED'),
       isThrusting: this.player.isHolding,
       isCoilTransition: (this.gameState === 'COIL_TRANSITION'),
       coilProgress: this.coilProgress || 0
